@@ -110,7 +110,8 @@ std::vector<complex> get_weather_data(std::string file_path) {
 
 int main() {
 
-    std::string file_path = "../natural_gas_co2_emissions_for_electric_power_sector.csv";
+    //std::string file_path = "../natural_gas_co2_emissions_for_electric_power_sector.csv";
+    std::string file_path = "data/Paris_data.csv";
     std::vector<complex> weather_data = get_weather_data(file_path);
 
     std::vector<complex> result = Radix2FFT(weather_data);
