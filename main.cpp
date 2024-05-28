@@ -33,6 +33,37 @@ std::vector<complex> Radix2FFT(std::vector<complex> P) {
     return res;
 }
 
+std::vector<complex> InverseRadix2FFT(std::vector<complex> P_star) {
+    int N = P_star.size();
+    if (N == 1){
+        return P_star;
+    }
+
+    std::vector<complex> U_star;
+    std::vector<complex> V_star;
+
+    for (int j = 0; j < N / 2; j++){
+        U_star[j] = P_star[2 * j];
+        V_star[j] = P_star[2 * j + 1];
+    }
+
+    std::vector<complex> U = InverseRadix2FFT(U_star);
+    std::vector<complex> V = InverseRadix2FFT(V_star);
+
+    double theta = 2 * M_PI - (2 * M_PI) / N;
+    complex omega_n = std::polar(1.0, theta);
+    complex omega = 1;
+    std::vector<complex> P(N); 
+
+    for (int j = 0; j < N / 2; j++){
+        P[j] = (U[j] + omega * V[j]) / 2.;
+        P[j + N / 2] = (U[j] - omega * V[j]) / 2.;
+        omega = omega * omega_n;
+    }
+
+    return P;
+}
+
 int main() {
     std::vector<complex> input = {1.0, 2.0, 3.0, 4.0};
     std::vector<complex> result = Radix2FFT(input);
