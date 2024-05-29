@@ -101,6 +101,70 @@ std::vector<complex> get_weather_data(std::string file_path) {
 
 }
 
+// Polynomial operations
+
+complex evaluate_polynomial_trivial(std::vector<complex> P, complex x){
+    int N = P.size();
+    complex X = 1.;
+    complex y;
+    for (int j = 0; j < N; j++){
+        y += P[j] * X;
+        X *= x;
+    }
+    return y;
+}
+
+std::vector<complex> add_polynomials(std::vector<complex> P, std::vector<complex> Q){
+    int N = std::max(P.size(), Q.size());
+    P.resize(N);
+    Q.resize(N);
+    std::vector<complex> R(N);
+    for (int j = 0; j < N; j++){
+        R[j] = P[j] + Q[j];
+    }
+    return R;
+}
+
+std::vector<complex> multiply_polynomials_trivial(std::vector<complex> P, std::vector<complex> Q){
+    int N = P.size();
+    int M = Q.size();
+    std::vector<complex> R(M + N, 0.);
+    for (int j = 0; j < N; j++){
+        for (int k = 0; k < M; k++){
+            R[j + k] += P[j] * Q[k];
+        }
+    }
+    return R;
+}
+
+complex horner_evaluate(std::vector<complex> P, complex x){
+    int N = P.size();
+    complex y = P[N - 1];
+    for (int j = N - 2; j >= 0; j--){
+        y = x * y + P[j];
+    }
+    return y;
+}
+
+int next_power_of_two(int n){
+    int m = std::ceil(std::log2(n));
+    return std::pow(2, m);
+}
+
+std::vector<complex> multiply_polynomials_FFT(std::vector<complex> P, std::vector<complex> Q){
+    int N = P.size();
+    int M = Q.size();
+    int l = next_power_of_two(M + N);
+    P.resize(l);
+    Q.resize(l);
+    std::vector<complex> P_star = Radix2FFT(P);
+    std::vector<complex> Q_star = Radix2FFT(Q);
+    std::vector<complex> R_star(l);
+    for (int j = 0; j < l; j++){
+        R_star[j] = P_star[j] * Q_star[j];
+    }
+    return InverseRadix2FFT(R_star);
+}
 
 int main() {
 
