@@ -25,7 +25,7 @@ std::vector<complex> Radix2FFT(std::vector<complex> P) {
     std::vector<complex> U_star = Radix2FFT(U);
     std::vector<complex> V_star = Radix2FFT(V);
     std::vector<complex> res(N);
-    double theta = (2 * M_PI) / N;
+    double theta = (-2 * M_PI) / N;
     complex omega_n = std::polar(1.0, theta);
     complex omega = 1;
     for (int i = 0; i < N / 2; i++) {
@@ -105,20 +105,25 @@ std::vector<complex> get_weather_data(std::string file_path) {
 int main() {
 
 //    std::string file_path = "../data/natural_gas_co2_emissions_for_electric_power_sector.csv";
-    std::string file_path = "../data/Paris_data.csv";
-    std::vector<complex> weather_data = get_weather_data(file_path);
+//    std::string file_path = "../data/Paris_data.csv";
+//    std::vector<complex> weather_data = get_weather_data(file_path);
+std::vector<complex> weather_data = {1, 2, 3, 4};
 
     std::vector<complex> result = Radix2FFT(weather_data);
-    std::vector<complex> inverse_result = InverseRadix2FFT(result);
-    if(weather_data.size() != inverse_result.size()) {
-        std::cout << "Error: The size of the input and output vectors are not the same!" << std::endl;
+    for (int i = 0; i < result.size(); i++) {
+        std::cout << result[i] << std::endl;
     }
 
-    for(int i = 0; i < inverse_result.size(); i++) {
-        if(weather_data[i] != inverse_result[i]) {
-            std::cout << "Error at index " << i << std::endl;
-        }
-    }
-    std::cout << std::endl;
+//    std::vector<complex> inverse_result = InverseRadix2FFT(result);
+//    if(weather_data.size() != inverse_result.size()) {
+//        std::cout << "Error: The size of the input and output vectors are not the same!" << std::endl;
+//    }
+//
+//    for(int i = 0; i < inverse_result.size(); i++) {
+//        if(weather_data[i] != inverse_result[i]) {
+//            std::cout << "Error at index " << i << std::endl;
+//            std::cout << "Input: " << weather_data[i] << " Output: " << inverse_result[i] << std::endl;
+//        }
+
     return 0;
 }
