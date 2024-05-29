@@ -42,8 +42,7 @@ std::vector<complex> InverseRadix2FFT(std::vector<complex> P_star) {
         return P_star;
     }
 
-    std::vector<complex> U_star;
-    std::vector<complex> V_star;
+    std::vector<complex> U_star(N / 2), V_star(N / 2);
 
     for (int j = 0; j < N / 2; j++){
         U_star[j] = P_star[2 * j];
@@ -98,11 +97,6 @@ std::vector<complex> get_weather_data(std::string file_path) {
     }
 
     file.close(); // Close the file
-
-    // Print the first column values (for verification)
-    for (const auto& value : weather_vector) {
-        std::cout << value << std::endl;
-    }
     return weather_vector;
 
 }
@@ -110,13 +104,20 @@ std::vector<complex> get_weather_data(std::string file_path) {
 
 int main() {
 
-    //std::string file_path = "../natural_gas_co2_emissions_for_electric_power_sector.csv";
-    std::string file_path = "data/Paris_data.csv";
+//    std::string file_path = "../data/natural_gas_co2_emissions_for_electric_power_sector.csv";
+    std::string file_path = "../data/Paris_data.csv";
     std::vector<complex> weather_data = get_weather_data(file_path);
 
     std::vector<complex> result = Radix2FFT(weather_data);
-    for (const auto& val : result) {
-        std::cout << val << " ";
+    std::vector<complex> inverse_result = InverseRadix2FFT(result);
+    if(weather_data.size() != inverse_result.size()) {
+        std::cout << "Error: The size of the input and output vectors are not the same!" << std::endl;
+    }
+
+    for(int i = 0; i < inverse_result.size(); i++) {
+        if(weather_data[i] != inverse_result[i]) {
+            std::cout << "Error at index " << i << std::endl;
+        }
     }
     std::cout << std::endl;
     return 0;
