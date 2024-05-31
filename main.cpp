@@ -291,7 +291,7 @@ void Inverse_Radix2_Parallel(std::vector<complex> &P_star, size_t num_threads) {
     }
 
     if (num_threads == 1) {
-        P_star = Radix2FFT(P_star);
+        P_star = InverseRadix2FFT(P_star);
         return;
     }
 
@@ -421,7 +421,7 @@ int main() {
         std::cout << "Time taken for serial FFT: " << elapsed_seconds_seq.count() << "s\n";
 
 
-        int num_threads = 8;
+        int num_threads = 4;
         start_parallel = std::chrono::system_clock::now();
         FFT_Radix2_Parallel(result_parallel, num_threads);
 
