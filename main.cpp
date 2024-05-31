@@ -54,9 +54,10 @@ std::vector<complex> Radix2FFT(std::vector<complex> P) {
 
 std::vector<complex> InverseRadix2FFT(std::vector<complex> P_star) {
     int N = P_star.size();
-    if (N == 1){
+    if (N == 1) {
         return P_star;
     }
+
     if (!is_power_of_two(N)) {
         std::cout << "The input size " << N << " is not a power of 2! Resizing input" << std::endl;
         P_star.resize(next_power_of_two(N));
@@ -65,7 +66,7 @@ std::vector<complex> InverseRadix2FFT(std::vector<complex> P_star) {
 
     std::vector<complex> U_star(N / 2), V_star(N / 2);
 
-    for (int j = 0; j < N / 2; j++){
+    for (int j = 0; j < N / 2; j++) {
         U_star[j] = P_star[2 * j];
         V_star[j] = P_star[2 * j + 1];
     }
@@ -73,19 +74,20 @@ std::vector<complex> InverseRadix2FFT(std::vector<complex> P_star) {
     std::vector<complex> U = InverseRadix2FFT(U_star);
     std::vector<complex> V = InverseRadix2FFT(V_star);
 
-    double theta = 2 * M_PI - (2 * M_PI) / N;
+    double theta = (-2 * M_PI) / N;
     complex omega_n = std::polar(1.0, theta);
-    complex omega = 1;
+    omega_n = std::conj(omega_n);
+    complex omega = 1.0;
     std::vector<complex> P(N);
 
-    for (int j = 0; j < N / 2; j++){
-        P[j] = (U[j] + omega * V[j]) / 2.;
-        P[j + N / 2] = (U[j] - omega * V[j]) / 2.;
-        omega = omega * omega_n;
+    for (int j = 0; j < N / 2; j++) {
+        P[j] = (U[j] + omega * V[j]) / 2.0;
+        P[j + N / 2] = (U[j] - omega * V[j]) / 2.0;
+        omega *= omega_n;
     }
 
     return P;
-    }
+}
 
 std::vector<complex> get_weather_data(std::string file_path) {
     std::ifstream file(file_path); // Open the CSV file
@@ -186,7 +188,7 @@ std::vector<complex> multiply_polynomials_FFT(std::vector<complex> P, std::vecto
     return InverseRadix2FFT(R_star);
 }
 
-void fft_radix2_par(std::vector<complex> &P, size_t num_threads) {
+void FFT_Radix2_Parallel(std::vector<complex> &P, size_t num_threads) {
     int N = P.size();
     if (!is_power_of_two(N)) {
         std::cout << "The input size " << N << " is not a power of 2! Resizing input" << std::endl;
@@ -237,8 +239,8 @@ void fft_radix2_par(std::vector<complex> &P, size_t num_threads) {
         }
         threads.clear();
 
-        std::thread t1(fft_radix2_par, std::ref(U), (num_threads + 1) / 2);
-        std::thread t2(fft_radix2_par, std::ref(V), (num_threads + 1) / 2);
+        std::thread t1(FFT_Radix2_Parallel, std::ref(U), (num_threads + 1) / 2);
+        std::thread t2(FFT_Radix2_Parallel, std::ref(V), (num_threads + 1) / 2);
         t1.join();
         t2.join();
 
@@ -276,7 +278,97 @@ void fft_radix2_par(std::vector<complex> &P, size_t num_threads) {
     }
 }
 
+void Inverse_Radix2_Parallel(std::vector<complex> &P_star, size_t num_threads) {
+    int N = P_star.size();
+    if (!is_power_of_two(N)) {
+        std::cout << "The input size " << N << " is not a power of 2! Resizing input" << std::endl;
+        P_star.resize(next_power_of_two(N));
+        N = P_star.size();
+    }
 
+    if (num_threads < 1) {
+        throw std::invalid_argument("Number of threads must be at least 1");
+    }
+
+    if (num_threads == 1) {
+        P_star = Radix2FFT(P_star);
+        return;
+    }
+
+    if (N == 1) {
+        return;
+    }
+
+    std::vector<std::thread> threads;
+    threads.reserve(num_threads - 1);
+
+    std::vector<complex> U(N / 2), V(N / 2);
+
+    try {
+        for (size_t t_i = 1; t_i < num_threads; t_i++) {
+            auto fun = [&, t_i] {
+                for (size_t i = t_i; 2 * i < N; i += num_threads) {
+                    U[i] = P_star[2 * i];
+                    V[i] = P_star[2 * i + 1];
+                }
+            };
+            threads.push_back(std::thread(fun));
+        }
+
+        for (size_t i = 0; 2 * i < N; i += num_threads) {
+            U[i] = P_star[2 * i];
+            if (2 * i + 1 < N) {
+                V[i] = P_star[2 * i + 1];
+            }
+        }
+
+        for (auto &thread : threads) {
+            if (thread.joinable()) {
+                thread.join();
+            }
+        }
+        threads.clear();
+
+        std::thread t1(Inverse_Radix2_Parallel, std::ref(U), (num_threads + 1) / 2);
+        std::thread t2(Inverse_Radix2_Parallel, std::ref(V), (num_threads + 1) / 2);
+        t1.join();
+        t2.join();
+
+        for (size_t t_i = 1; t_i < num_threads; t_i++) {
+            auto fun = [&, t_i] {
+                for (size_t i = t_i; 2 * i < N; i += num_threads) {
+                    complex t = std::polar(1.0, -2 * M_PI * i / N);
+                    t = std::conj(t);
+                    P_star[i] = (U[i] + t * V[i])/2.;
+                    P_star[i + N / 2] = (U[i] - t * V[i])/2.;
+                }
+            };
+            threads.push_back(std::thread(fun));
+        }
+
+        for (size_t i = 0; 2 * i < N; i += num_threads) {
+            complex t = std::polar(1.0, 2 * M_PI * i / N);
+            t = std::conj(t);
+            P_star[i] = (U[i] + t * V[i])/2.;
+            P_star[i + N / 2] = (U[i] - t * V[i])/2.;
+        }
+
+        for (auto &thread : threads) {
+            if (thread.joinable()) {
+                thread.join();
+            }
+        }
+        threads.clear();
+    } catch (const std::exception &e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        for (auto &thread : threads) {
+            if (thread.joinable()) {
+                thread.join();
+            }
+        }
+        throw;
+    }
+}
 
 
 
@@ -305,48 +397,64 @@ int main() {
     else {
         file_path = "../data/natural_gas_co2_emissions_for_electric_power_sector.csv";
 //           file_path = "../data/Paris_data.csv";
-//        std::vector<complex> weather_data = get_weather_data(file_path);
-//        std::vector<complex> weather_data_parallel =  get_weather_data(file_path);
+        std::vector<complex> weather_data = get_weather_data(file_path);
+        std::vector<complex> weather_data_parallel =  get_weather_data(file_path);
+        std::vector<complex> result_seq = get_weather_data(file_path);
+        std::vector<complex> result_parallel =  get_weather_data(file_path);
 //        std::vector<complex> weather_data = generate_synthetic_data(2048);
 
 //
-    std::vector<complex> weather_data = {1, 2, 3, 4, 5};
-    std::vector<complex> weather_data_parallel = {1, 2, 3, 4, 5};
+//    std::vector<complex> weather_data = {1, 2, 3, 4};
+//    std::vector<complex> weather_data_parallel = {1, 2, 3, 4};
 
 //        std::cout << "Size of the input vector: " << weather_data.size() << std::endl;
 
         std::chrono :: time_point<std::chrono::system_clock> start_seq, end_seq, start_parallel, end_parallel;
         start_seq = std::chrono::system_clock::now();
-        weather_data = Radix2FFT(weather_data);
+        result_seq = Radix2FFT(weather_data);
+
+        // Lines to check IFFT
+        result_seq = InverseRadix2FFT(result_seq);
+
         end_seq = std::chrono::system_clock::now();
         std::chrono::duration<double> elapsed_seconds_seq = end_seq - start_seq;
         std::cout << "Time taken for serial FFT: " << elapsed_seconds_seq.count() << "s\n";
 
+
         int num_threads = 8;
         start_parallel = std::chrono::system_clock::now();
-        fft_radix2_par(weather_data_parallel, num_threads);
+        FFT_Radix2_Parallel(result_parallel, num_threads);
+
+        // Lines to check IFFT
+        Inverse_Radix2_Parallel(result_parallel, num_threads);
         end_parallel = std::chrono::system_clock::now();
         std::chrono::duration<double> elapsed_seconds_parallel = end_parallel - start_parallel;
 
         std::cout << "Time taken for parallel FFT with " << num_threads << " threads: " << elapsed_seconds_parallel.count() << "s\n";
+
+        // Comparison of Sequential and parallel
 //        for (int i = 0; i < weather_data.size(); i++) {
-//            if (std::abs(weather_data[i] - weather_data_parallel[i]) > 1e-6){
+//            if (std::abs(result_seq[i] - result_parallel[i]) > 1e-6){
 //                std::cout << "Error at index " << i << std::endl;
-//                std::cout << "Input: " << weather_data[i] << " Output: " << weather_data_parallel[i] << std::endl;
+//                std::cout << "Sequential: " << result_seq[i] << " Parallel: " << result_parallel[i] << std::endl;
 //            }
 //        }
+        // Comparison of sequential with actual data
+        for (int i = 0; i < weather_data.size(); i++) {
+            if (std::abs(result_seq[i] - weather_data[i]) > 1e-6){
+                std::cout << "Error at index " << i << std::endl;
+                std::cout << "Sequential: " << result_seq[i] << " Actual: " << weather_data[i] << std::endl;
+            }
+        }
 
-//    std::vector<complex> inverse_result = InverseRadix2FFT(result);
-//    if(weather_data.size() != inverse_result.size()) {
-//        std::cout << "Error: The size of the input and output vectors are not the same!" << std::endl;
-//    }
-//
-//    for(int i = 0; i < inverse_result.size(); i++) {
-//        if (weather_data[i] != inverse_result[i]) {
-//            std::cout << "Error at index " << i << std::endl;
-//            std::cout << "Input: " << weather_data[i] << " Output: " << inverse_result[i] << std::endl;
-//        }
-//    }
+        // Comparison of parallel with actual data
+        for (int i = 0; i < weather_data.size(); i++) {
+            if (std::abs(result_parallel[i] - weather_data_parallel[i]) > 1e-6){
+                std::cout << "Error at index " << i << std::endl;
+                std::cout << "Parallel: " << result_parallel[i] << " Actual: " << weather_data_parallel[i] << std::endl;
+            }
+        }
+
 
     }
 
