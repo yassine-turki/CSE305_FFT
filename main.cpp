@@ -5,9 +5,14 @@
 #include <fstream>
 #include <string>
 #include <thread>
+#include <chrono>
+#include <sstream>
+#include <stdexcept>
+
 #define M_PI 3.14159265358979323846
 
 typedef std::complex<double> complex;
+
 
 
 bool is_power_of_two(int n){
@@ -188,189 +193,136 @@ std::vector<complex> multiply_polynomials_FFT(std::vector<complex> P, std::vecto
     return InverseRadix2FFT(R_star);
 }
 
-void FFT_Radix2_Parallel(std::vector<complex> &P, size_t num_threads) {
-    int N = P.size();
+
+
+void split_data_FFT(const std::vector<complex>& P, std::vector<complex>& U, std::vector<complex>& V, size_t start, size_t end) {
+    for (size_t i = start; i < end; ++i) {
+        U[i] = P[2 * i];
+        V[i] = P[2 * i + 1];
+    }
+}
+
+void combine_results_FFT(std::vector<complex>& P, const std::vector<complex>& U, const std::vector<complex>& V, size_t N, size_t start, size_t end) {
+    for (size_t i = start; i < end; ++i) {
+        complex t = std::polar(1.0, -2 * M_PI * i / N);
+        P[i] = U[i] + t * V[i];
+        P[i + N / 2] = U[i] - t * V[i];
+    }
+}
+
+void FFT_Radix2_Parallel(std::vector<complex>& P, size_t num_threads) {
+    size_t N = P.size();
     if (!is_power_of_two(N)) {
         std::cout << "The input size " << N << " is not a power of 2! Resizing input" << std::endl;
-        P.resize(next_power_of_two(N));
-        N = P.size();
+        N = next_power_of_two(N);
+        P.resize(N);
     }
 
-    if (num_threads < 1) {
-        throw std::invalid_argument("Number of threads must be at least 1");
-    }
-
-    if (num_threads == 1) {
+    if (num_threads == 1 || N == 1) {
         P = Radix2FFT(P);
         return;
     }
 
-    if (N == 1) {
-        return;
-    }
-
-    std::vector<std::thread> threads;
-    threads.reserve(num_threads - 1);
-
     std::vector<complex> U(N / 2), V(N / 2);
 
-    try {
-        for (size_t t_i = 1; t_i < num_threads; t_i++) {
-            auto fun = [&, t_i] {
-                for (size_t i = t_i; 2 * i < N; i += num_threads) {
-                    U[i] = P[2 * i];
-                    V[i] = P[2 * i + 1];
-                }
-            };
-            threads.push_back(std::thread(fun));
-        }
+    size_t split_threads = std::min(num_threads, N / 2);
+    size_t chunk_size = (N / 2 + split_threads - 1) / split_threads;
+    std::vector<std::thread> split_threads_list;
 
-        for (size_t i = 0; 2 * i < N; i += num_threads) {
-            U[i] = P[2 * i];
-            if (2 * i + 1 < N) {
-                V[i] = P[2 * i + 1];
-            }
-        }
+    for (size_t t = 0; t < split_threads; ++t) {
+        size_t start = t * chunk_size;
+        size_t end = std::min(start + chunk_size, N / 2);
+        split_threads_list.emplace_back(split_data_FFT, std::cref(P), std::ref(U), std::ref(V), start, end);
+    }
 
-        for (auto &thread : threads) {
-            if (thread.joinable()) {
-                thread.join();
-            }
-        }
-        threads.clear();
+    for (auto& th : split_threads_list) {
+        th.join();
+    }
 
-        std::thread t1(FFT_Radix2_Parallel, std::ref(U), (num_threads + 1) / 2);
-        std::thread t2(FFT_Radix2_Parallel, std::ref(V), (num_threads + 1) / 2);
-        t1.join();
-        t2.join();
+    std::thread t1(FFT_Radix2_Parallel, std::ref(U), num_threads / 2);
+    std::thread t2(FFT_Radix2_Parallel, std::ref(V), num_threads / 2);
+    t1.join();
+    t2.join();
 
-        for (size_t t_i = 1; t_i < num_threads; t_i++) {
-            auto fun = [&, t_i] {
-                for (size_t i = t_i; 2 * i < N; i += num_threads) {
-                    complex t = std::polar(1.0, -2 * M_PI * i / N);
-                    P[i] = U[i] + t * V[i];
-                    P[i + N / 2] = U[i] - t * V[i];
-                }
-            };
-            threads.push_back(std::thread(fun));
-        }
+    split_threads_list.clear();
+    for (size_t t = 0; t < split_threads; ++t) {
+        size_t start = t * chunk_size;
+        size_t end = std::min(start + chunk_size, N / 2);
+        split_threads_list.emplace_back(combine_results_FFT, std::ref(P), std::cref(U), std::cref(V), N, start, end);
+    }
 
-        for (size_t i = 0; 2 * i < N; i += num_threads) {
-            complex t = std::polar(1.0, -2 * M_PI * i / N);
-            P[i] = U[i] + t * V[i];
-            P[i + N / 2] = U[i] - t * V[i];
-        }
-
-        for (auto &thread : threads) {
-            if (thread.joinable()) {
-                thread.join();
-            }
-        }
-        threads.clear();
-    } catch (const std::exception &e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-        for (auto &thread : threads) {
-            if (thread.joinable()) {
-                thread.join();
-            }
-        }
-        throw;
+    for (auto& th : split_threads_list) {
+        th.join();
     }
 }
 
-void Inverse_Radix2_Parallel(std::vector<complex> &P_star, size_t num_threads) {
-    int N = P_star.size();
+
+
+/////////////////////////////// IFFT //////////////////////////////////////////
+
+void split_data_IFFT(const std::vector<complex>& P_star, std::vector<complex>& U, std::vector<complex>& V, size_t start, size_t end) {
+    for (size_t i = start; i < end; ++i) {
+        U[i] = P_star[2 * i];
+        V[i] = P_star[2 * i + 1];
+    }
+}
+
+
+void combine_results_IFFT(std::vector<complex>& P_star, const std::vector<complex>& U, const std::vector<complex>& V, size_t N, size_t start, size_t end) {
+    for (size_t i = start; i < end; ++i) {
+        complex t = std::polar(1.0, -2 * M_PI * i / N);
+        t = std::conj(t);
+        P_star[i] = (U[i] + t * V[i]) / 2.0;
+        P_star[i + N / 2] = (U[i] - t * V[i]) / 2.0;
+    }
+}
+
+void Inverse_Radix2_Parallel(std::vector<complex>& P_star, size_t num_threads) {
+
+    size_t N = P_star.size();
     if (!is_power_of_two(N)) {
         std::cout << "The input size " << N << " is not a power of 2! Resizing input" << std::endl;
-        P_star.resize(next_power_of_two(N));
-        N = P_star.size();
+        N = next_power_of_two(N);
+        P_star.resize(N);
     }
 
-    if (num_threads < 1) {
-        throw std::invalid_argument("Number of threads must be at least 1");
-    }
-
-    if (num_threads == 1) {
+    if (num_threads == 1 || N == 1) {
         P_star = InverseRadix2FFT(P_star);
         return;
     }
 
-    if (N == 1) {
-        return;
-    }
-
-    std::vector<std::thread> threads;
-    threads.reserve(num_threads - 1);
-
     std::vector<complex> U(N / 2), V(N / 2);
 
-    try {
-        for (size_t t_i = 1; t_i < num_threads; t_i++) {
-            auto fun = [&, t_i] {
-                for (size_t i = t_i; 2 * i < N; i += num_threads) {
-                    U[i] = P_star[2 * i];
-                    V[i] = P_star[2 * i + 1];
-                }
-            };
-            threads.push_back(std::thread(fun));
-        }
+    size_t split_threads = std::min(num_threads, N / 2);
+    size_t chunk_size = (N / 2 + split_threads - 1) / split_threads;
+    std::vector<std::thread> split_threads_list;
 
-        for (size_t i = 0; 2 * i < N; i += num_threads) {
-            U[i] = P_star[2 * i];
-            if (2 * i + 1 < N) {
-                V[i] = P_star[2 * i + 1];
-            }
-        }
+    for (size_t t = 0; t < split_threads; ++t) {
+        size_t start = t * chunk_size;
+        size_t end = std::min(start + chunk_size, N / 2);
+        split_threads_list.emplace_back(split_data_IFFT, std::cref(P_star), std::ref(U), std::ref(V), start, end);
+    }
 
-        for (auto &thread : threads) {
-            if (thread.joinable()) {
-                thread.join();
-            }
-        }
-        threads.clear();
+    for (auto& th : split_threads_list) {
+        th.join();
+    }
 
-        std::thread t1(Inverse_Radix2_Parallel, std::ref(U), (num_threads + 1) / 2);
-        std::thread t2(Inverse_Radix2_Parallel, std::ref(V), (num_threads + 1) / 2);
-        t1.join();
-        t2.join();
+    std::thread t1(Inverse_Radix2_Parallel, std::ref(U), num_threads / 2);
+    std::thread t2(Inverse_Radix2_Parallel, std::ref(V), num_threads / 2);
+    t1.join();
+    t2.join();
 
-        for (size_t t_i = 1; t_i < num_threads; t_i++) {
-            auto fun = [&, t_i] {
-                for (size_t i = t_i; 2 * i < N; i += num_threads) {
-                    complex t = std::polar(1.0, -2 * M_PI * i / N);
-                    t = std::conj(t);
-                    P_star[i] = (U[i] + t * V[i])/2.;
-                    P_star[i + N / 2] = (U[i] - t * V[i])/2.;
-                }
-            };
-            threads.push_back(std::thread(fun));
-        }
+    split_threads_list.clear();
+    for (size_t t = 0; t < split_threads; ++t) {
+        size_t start = t * chunk_size;
+        size_t end = std::min(start + chunk_size, N / 2);
+        split_threads_list.emplace_back(combine_results_IFFT, std::ref(P_star), std::cref(U), std::cref(V), N, start, end);
+    }
 
-        for (size_t i = 0; 2 * i < N; i += num_threads) {
-            complex t = std::polar(1.0, 2 * M_PI * i / N);
-            t = std::conj(t);
-            P_star[i] = (U[i] + t * V[i])/2.;
-            P_star[i + N / 2] = (U[i] - t * V[i])/2.;
-        }
-
-        for (auto &thread : threads) {
-            if (thread.joinable()) {
-                thread.join();
-            }
-        }
-        threads.clear();
-    } catch (const std::exception &e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-        for (auto &thread : threads) {
-            if (thread.joinable()) {
-                thread.join();
-            }
-        }
-        throw;
+    for (auto& th : split_threads_list) {
+        th.join();
     }
 }
-
-
 
 std::vector<complex> generate_synthetic_data(int num_points) {
     std::vector<complex> data(num_points);
@@ -395,17 +347,29 @@ int main() {
 
     }
     else {
-        file_path = "../data/natural_gas_co2_emissions_for_electric_power_sector.csv";
-//           file_path = "../data/Paris_data.csv";
+
+        // Test with dummy data
+//        std::vector<complex> weather_data = {1, 2, 3, 4};
+//        std::vector<complex> weather_data_parallel = {1, 2, 3, 4};
+//        std::vector<complex> result_seq = {1, 2, 3, 4};
+//        std::vector<complex> result_parallel = {1, 2, 3, 4};
+
+        // Test with data from file
+
+//        file_path = "../data/natural_gas_co2_emissions_for_electric_power_sector.csv";
+           file_path = "../data/Paris_data.csv";
+
+
         std::vector<complex> weather_data = get_weather_data(file_path);
         std::vector<complex> weather_data_parallel =  get_weather_data(file_path);
         std::vector<complex> result_seq = get_weather_data(file_path);
         std::vector<complex> result_parallel =  get_weather_data(file_path);
+
+
 //        std::vector<complex> weather_data = generate_synthetic_data(2048);
 
 //
-//    std::vector<complex> weather_data = {1, 2, 3, 4};
-//    std::vector<complex> weather_data_parallel = {1, 2, 3, 4};
+
 
 //        std::cout << "Size of the input vector: " << weather_data.size() << std::endl;
 
@@ -421,7 +385,7 @@ int main() {
         std::cout << "Time taken for serial FFT: " << elapsed_seconds_seq.count() << "s\n";
 
 
-        int num_threads = 4;
+        int num_threads = 10;
         start_parallel = std::chrono::system_clock::now();
         FFT_Radix2_Parallel(result_parallel, num_threads);
 
@@ -433,12 +397,12 @@ int main() {
         std::cout << "Time taken for parallel FFT with " << num_threads << " threads: " << elapsed_seconds_parallel.count() << "s\n";
 
         // Comparison of Sequential and parallel
-//        for (int i = 0; i < weather_data.size(); i++) {
-//            if (std::abs(result_seq[i] - result_parallel[i]) > 1e-6){
-//                std::cout << "Error at index " << i << std::endl;
-//                std::cout << "Sequential: " << result_seq[i] << " Parallel: " << result_parallel[i] << std::endl;
-//            }
-//        }
+        for (int i = 0; i < weather_data.size(); i++) {
+            if (std::abs(result_seq[i] - result_parallel[i]) > 1e-6){
+                std::cout << "Error at index " << i << std::endl;
+                std::cout << "Sequential: " << result_seq[i] << " Parallel: " << result_parallel[i] << std::endl;
+            }
+        }
         // Comparison of sequential with actual data
         for (int i = 0; i < weather_data.size(); i++) {
             if (std::abs(result_seq[i] - weather_data[i]) > 1e-6){
