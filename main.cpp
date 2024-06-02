@@ -5,9 +5,9 @@
 #include <fstream>
 #include <string>
 #include <thread>
-#include <chrono>
 #include <sstream>
-#include <stdexcept>
+#include <algorithm>
+#include <chrono>
 
 #define M_PI 3.14159265358979323846
 
@@ -340,38 +340,34 @@ int main() {
 
     bool test_alex = 0;
     std::string file_path;
+    std::vector<complex> weather_data;
     if(test_alex){
 //         file_path = "data/natural_gas_co2_emissions_for_electric_power_sector.csv";
          file_path = "data/Paris_data.csv";
-        std::vector<complex> weather_data = get_weather_data(file_path);
+         weather_data = get_weather_data(file_path);
 
     }
     else {
 
-        // Test with dummy data
-//        std::vector<complex> weather_data = {1, 2, 3, 4};
-//        std::vector<complex> weather_data_parallel = {1, 2, 3, 4};
-//        std::vector<complex> result_seq = {1, 2, 3, 4};
-//        std::vector<complex> result_parallel = {1, 2, 3, 4};
+        bool use_dummy_data = 0; // Test it on {1, 2, 3, 4}
+        bool use_synthetic_data = 1; // Test it on synthetic data (sine)
+        bool use_weather_data = 0; // Test it on weather data from file
 
-        // Test with data from file
+        if(use_dummy_data){
+            weather_data = {1, 2, 3, 4};
+        }
+        else if(use_synthetic_data){
+            weather_data = generate_synthetic_data(30000);
+        }
+        else if(use_weather_data){
+            file_path = "../data/natural_gas_co2_emissions_for_electric_power_sector.csv";
+//            file_path = "../data/Paris_data.csv";
+            weather_data = get_weather_data(file_path);
+        }
 
-//        file_path = "../data/natural_gas_co2_emissions_for_electric_power_sector.csv";
-           file_path = "../data/Paris_data.csv";
+        std::vector<complex> weather_data_parallel = weather_data;
+        std::vector<complex> result_seq, result_parallel = weather_data_parallel;
 
-
-        std::vector<complex> weather_data = get_weather_data(file_path);
-        std::vector<complex> weather_data_parallel =  get_weather_data(file_path);
-        std::vector<complex> result_seq = get_weather_data(file_path);
-        std::vector<complex> result_parallel =  get_weather_data(file_path);
-
-
-//        std::vector<complex> weather_data = generate_synthetic_data(2048);
-
-//
-
-
-//        std::cout << "Size of the input vector: " << weather_data.size() << std::endl;
 
         std::chrono :: time_point<std::chrono::system_clock> start_seq, end_seq, start_parallel, end_parallel;
         start_seq = std::chrono::system_clock::now();
