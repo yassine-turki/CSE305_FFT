@@ -357,7 +357,7 @@ int main() {
             weather_data = {1, 2, 3, 4};
         }
         else if(use_synthetic_data){
-            weather_data = generate_synthetic_data(30000);
+            weather_data = generate_synthetic_data(10E4);
         }
         else if(use_weather_data){
             file_path = "../data/natural_gas_co2_emissions_for_electric_power_sector.csv";
