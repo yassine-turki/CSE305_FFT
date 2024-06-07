@@ -99,7 +99,7 @@ bool is_prime(int p){
 std::vector<int> prime_fft_find(int n){ 
     // we transformed the algorithm for making sure that the 2n-th root exists
     int k = 2;
-    int p = n + 1;
+    int p = 2 * n + 1;
     while (true){
         if (is_prime(p)){
             break;
@@ -178,8 +178,6 @@ int find_2n_root(int p, int n){
 std::vector<int> ntt(std::vector<int> a, int p){
     int n = a.size();
     std::vector<int> a_star(n);
-    // std::vector<int> pair = prime_fft_find(n);
-    // int p = pair[0];
     int psi = find_2n_root(p, n);
     for (int i = 0; i < n; i++){
         for (int j = 0; j < n; j++){
@@ -192,8 +190,6 @@ std::vector<int> ntt(std::vector<int> a, int p){
 std::vector<int> intt(std::vector<int> a_star, int p){
     int n = a_star.size();
     std::vector<int> a(n);
-    // std::vector<int> pair = prime_fft_find(n);
-    // int p = pair[0];
     int psi = find_2n_root(p, n);
     int inv_psi = mod_exp(psi, 2 * n - 1, p);
     int inv_n = mod_exp(n, p - 2, p);
@@ -221,102 +217,123 @@ std::vector<int> convolution_ntt(std::vector<int> a, std::vector<int> b){
     return intt(c_star, p);
 }
 
-std::vector<int> Radix2FFT_int(std::vector<int> P, int p, int omega) {
-    int N = P.size();
-    if(!is_power_of_two(N)){
-        std::cout << "The input size " << N << " is not a power of 2! Resizing input" << std::endl;
-        P.resize(next_power_of_two(P.size()));
-        N = P.size();
+std::vector<int> fast_ntt(std::vector<int> a, int p) {
+    int n = a.size();
+    if(!is_power_of_two(n)){
+        std::cout << "The input size " << n << " is not a power of 2! Resizing input" << std::endl;
+        a.resize(next_power_of_two(a.size()));
+        n = a.size();
     }
 
-    if (N == 1) {
-        return P;
+    if (n == 1) {
+        return a;
     }
 
-    // std::vector<int> pair = prime_fft_find(N);
-    // int p = pair[0];
-    // int k = pair[1];
-    // int g = find_generator(p, N);
-    // int omega = mod_exp(g, k, p);
-
-    std::vector<int> U(N / 2), V(N / 2);
-    for (int i = 0; i < N / 2; i++) {
-        U[i] = P[2 * i];
-        V[i] = P[2 * i + 1];
+    int psi = find_2n_root(p, n);
+    std::vector<int> u(n / 2), v(n / 2);
+    for (int i = 0; i < n / 2; i++) {
+        u[i] = a[2 * i];
+        v[i] = a[2 * i + 1];
     }
 
-    std::vector<int> U_star = Radix2FFT_int(U, p, mod_exp(omega, 2, p));
-    std::vector<int> V_star = Radix2FFT_int(V, p, mod_exp(omega, 2, p));
-    std::vector<int> res(N);
+    std::vector<int> u_star = fast_ntt(u, p);
+    std::vector<int> v_star = fast_ntt(v, p);
+    std::vector<int> a_star(n);
+
+    int t = psi;
+    for (int i = 0; i < n / 2; i++) {
+        a_star[i] = (u_star[i] + t * v_star[i]) % p;
+        if (a_star[i] < 0) a_star[i] += p;
+        a_star[i + n / 2] = (u_star[i] - t * v_star[i]) % p;
+        if (a_star[i + n / 2] < 0) a_star[i + n / 2] += p;
+        t = (t * mod_exp(psi, 2, p)) % p;
+    }
+    return a_star;
+}
+
+// std::vector<int> fast_ntt_2(std::vector<int> a, int p){
+//     int n = a.size();
+//     if(!is_power_of_two(n)){
+//         std::cout << "The input size " << n << " is not a power of 2! Resizing input" << std::endl;
+//         a.resize(next_power_of_two(a.size()));
+//         n = a.size();
+//     }
+
+//     if (n == 1) {
+//         return a;
+//     }
+
+//     int psi = find_2n_root(p, n);
+
+//     int t = n;
+//     for (int m = 1; m < n; m = 2 * m){
+//         t = t / 2;
+//         for (int i = 0; i < m; i++){
+//             int j_1 = 2 * i * t;
+//             int j_2 = j_1 + t - 1;
+//             int S = mod_exp(psi, 2 * n - m - i, p);
+//             for (int j = j_1; j < j_2; j++){
+//                 int u = a[j];
+//                 int v = a[j + t] * S;
+//                 a[j] = (u + v) % p;
+//                 a[j + t] = (u - v) % p;
+//             }
+//         }
+//     }
+//     return a;
+// }
+
+
+std::vector<int> fast_intt(std::vector<int> a_star, int p) {
+    int n = a_star.size();
+    if (n == 1) {
+        return a_star;
+    }
+
+    if (!is_power_of_two(n)) {
+        std::cout << "The input size " << n << " is not a power of 2! Resizing input" << std::endl;
+        a_star.resize(next_power_of_two(n));
+        n = a_star.size();
+    }
+
+    int psi = find_2n_root(p, n);
+    int inv_psi = mod_exp(psi, 2 * n - 1, p);
+    int inv_n = mod_exp(n, p - 2, p);
+
+    std::vector<int> u_star(n / 2), v_star(n / 2);
+
+    for (int j = 0; j < n / 2; j++) {
+        u_star[j] = a_star[j];
+        v_star[j] = a_star[n / 2 + j];
+    }
+
+    std::vector<int> u = fast_intt(u_star, p);
+    std::vector<int> v = fast_intt(v_star, p);
 
     int t = 1;
-    for (int i = 0; i < N / 2; i++) {
-        res[i] = U_star[i] + t * V_star[i];
-        res[i + N / 2] = U_star[i] - t * V_star[i];
-        t = (t * omega) % p;
+    std::vector<int> a(n);
+
+    for (int i = 0; i < n / 2; i++) {
+        a[2 * i] = ((u[i] + v[i]) * inv_psi) % p;
+        a[2 * i] = (a[2 * i] * inv_n) % p;
+        a[2 * i + 1] = ((u[i] - v[i]) * inv_psi) % p;
+        a[2 * i + 1] = (a[2 * i + 1] * inv_n) % p;
     }
-    return res;
+
+    return a;
 }
 
-std::vector<int> InverseRadix2FFT_int(std::vector<int> P_star, int p, int omega) {
-    int N = P_star.size();
-    if (N == 1) {
-        return P_star;
+std::vector<int> FFT_convolution(std::vector<int> a, std::vector<int> b){
+    int n = std::max(a.size(), b.size());
+    a.resize(n);
+    b.resize(n);
+    std::vector<int> pair = prime_fft_find(n);
+    int p = pair[0];
+    std::vector<int> a_star = fast_ntt(a, p);
+    std::vector<int> b_star = fast_ntt(b, p);
+    std::vector<int> c_star(n);
+    for (int i = 0; i < n; i++){
+        c_star[i] = (a_star[i] * b_star[i]) % p;
     }
-
-    if (!is_power_of_two(N)) {
-        std::cout << "The input size " << N << " is not a power of 2! Resizing input" << std::endl;
-        P_star.resize(next_power_of_two(N));
-        N = P_star.size();
-    }
-
-    // std::vector<int> pair = prime_fft_find(N);
-    // int p = pair[0];
-    // int k = pair[1];
-    // int g = find_generator(p, N);
-    // int omega = mod_exp(g, k, p);
-
-    std::vector<int> U_star(N / 2), V_star(N / 2);
-
-    for (int j = 0; j < N / 2; j++) {
-        U_star[j] = P_star[2 * j];
-        V_star[j] = P_star[2 * j + 1];
-    }
-
-    std::vector<int> U = InverseRadix2FFT_int(U_star, p, mod_exp(omega, 2, p));
-    std::vector<int> V = InverseRadix2FFT_int(V_star, p, mod_exp(omega, 2, p));
-
-    int t = 1;
-    std::vector<int> P(N);
-
-    for (int j = 0; j < N / 2; j++) {
-        P[j] = (U[j] + t * V[j]) / 2;
-        P[j + N / 2] = (U[j] - t * V[j]) / 2;
-        t = (t * omega) % p;
-    }
-
-    return P;
+    return fast_intt(c_star, p);
 }
-
-std::vector<int> multiply_polynomials_FFT_int(std::vector<int> P, std::vector<int> Q){
-    int N = P.size();
-    int M = Q.size();
-    int l = next_power_of_two(M + N);
-    P.resize(l);
-    Q.resize(l);
-
-    std::vector<int> pair = prime_fft_find(l);
-    int p = pair[0];  
-    int k = pair[1];
-    int g = find_generator(p, N);
-    int omega = mod_exp(g, k, p);
-
-    std::vector<int> P_star = Radix2FFT_int(P, p, omega);
-    std::vector<int> Q_star = Radix2FFT_int(Q, p, omega);
-    std::vector<int> R_star(l);
-    for (int j = 0; j < l; j++){
-        R_star[j] = (P_star[j] * Q_star[j]) % p;
-    }
-    return InverseRadix2FFT_int(R_star, p, mod_exp(omega, l - 1, p));
-}
-
