@@ -216,7 +216,6 @@ std::vector<int> convolution_ntt(std::vector<int> a, std::vector<int> b){
     b.resize(n);
     std::vector<int> pair = prime_fft_find(n);
     int p = pair[0];
-    //std::vector<int> roots = find_2n_roots(p, n);
     std::vector<int> a_star = ntt(a, p);
     std::vector<int> b_star = ntt(b, p);
     std::vector<int> c_star(n);
@@ -261,6 +260,78 @@ std::vector<int> fast_ntt(std::vector<int> a, int p) {
 }
 
 
+// std::vector<int> fast_intt(std::vector<int> a_star, int p) {
+//     int n = a_star.size();
+//     if (n == 1) {
+//         return a_star;
+//     }
+
+//     if (!is_power_of_two(n)) {
+//         std::cout << "The input size " << n << " is not a power of 2! Resizing input" << std::endl;
+//         a_star.resize(next_power_of_two(n));
+//         n = a_star.size();
+//     }
+
+//     int psi = find_2n_roots(p, n)[0];
+//     int inv_psi = find_2n_roots(p, n)[1];
+//     // std::cout<<"Psi in fast_intt is "<<psi<<std::endl;
+//     // std::cout<<"Inv_psi in fast_intt is "<<inv_psi<<std::endl;
+//     if (((inv_psi * psi) % p) != 1){
+//         throw std::runtime_error("The roots are not well computed");
+//     }
+//     int inv_n = mod_exp(n, p - 2, p);
+
+//     std::vector<int> u_star(n / 2), v_star(n / 2);
+
+//     for (int j = 0; j < n / 2; j++) {
+//         u_star[j] = a_star[j];
+//         v_star[j] = a_star[n / 2 + j];
+//     }
+
+//     std::vector<int> u = fast_intt(u_star, p);
+//     std::vector<int> v = fast_intt(v_star, p);
+
+//     int t = 1;
+//     std::vector<int> a(n);
+
+//     for (int i = 0; i < n / 2; i++) {
+//         a[2 * i] = (((u[i] + v[i]) % p * t) % p * inv_n) % p;
+//         if (a[2 * i] < 0) a[2 * i] += p;
+//         a[2 * i + 1] = (((u[i] - v[i]) % p * t) % p * inv_n) % p;
+//         if (a[2 * i + 1] < 0) a[2 * i + 1] += p;
+//         t = (t * mod_exp(inv_psi, 2, p)) % p;
+//     }
+
+//     return a;
+// }
+
+unsigned int reverse_bits(unsigned int x, int num_bits) {
+    unsigned int result = 0;
+    for (int i = 0; i < num_bits; i++) {
+        result = (result << 1) | (x & 1);
+        x >>= 1;
+    }
+    return result;
+}
+
+std::vector<int> compute_powers_of_psi(int psi, int n, int p) {
+    int num_bits = std::log2(n);
+    std::vector<int> powers(n);
+    std::vector<int> bit_reversed_powers(n);
+
+    powers[0] = 1;
+    for (int i = 1; i < n; i++) {
+        powers[i] = (powers[i - 1] * psi) % p;
+    }
+
+    for (int i = 0; i < n; i++) {
+        unsigned int reversed_index = reverse_bits(i, num_bits);
+        bit_reversed_powers[reversed_index] = powers[i];
+    }
+
+    return bit_reversed_powers;
+}
+
 std::vector<int> fast_intt(std::vector<int> a_star, int p) {
     int n = a_star.size();
     if (n == 1) {
@@ -273,38 +344,43 @@ std::vector<int> fast_intt(std::vector<int> a_star, int p) {
         n = a_star.size();
     }
 
-    int psi = find_2n_roots(p, n)[0];
-    int inv_psi = find_2n_roots(p, n)[1];
-    std::cout<<"Psi in fast_intt is "<<psi<<std::endl;
-    std::cout<<"Inv_psi in fast_intt is "<<inv_psi<<std::endl;
+    std::vector<int> roots = find_2n_roots(p, n);
+    int psi = roots[0];
+    int inv_psi = roots[1];
     if (((inv_psi * psi) % p) != 1){
         throw std::runtime_error("The roots are not well computed");
     }
     int inv_n = mod_exp(n, p - 2, p);
-
-    std::vector<int> u_star(n / 2), v_star(n / 2);
-
-    for (int j = 0; j < n / 2; j++) {
-        u_star[j] = a_star[j];
-        v_star[j] = a_star[n / 2 + j];
-    }
-
-    std::vector<int> u = fast_intt(u_star, p);
-    std::vector<int> v = fast_intt(v_star, p);
-
+    std::vector<int> powers_inv_psi = compute_powers_of_psi(inv_psi, n, p);
+    
     int t = 1;
-    std::vector<int> a(n);
-
-    for (int i = 0; i < n / 2; i++) {
-        a[2 * i] = (((u[i] + v[i]) % p * t) % p * inv_n) % p;
-        if (a[2 * i] < 0) a[2 * i] += p;
-        a[2 * i + 1] = (((u[i] - v[i]) % p * t) % p * inv_n) % p;
-        if (a[2 * i + 1] < 0) a[2 * i + 1] += p;
-        t = (t * mod_exp(inv_psi, 2, p)) % p;
+    int m = n / 2;
+    while (m > 0) {
+        int k = 0;
+        for (int i = 0; i < m; i++) {
+            int S = powers_inv_psi[m + i];
+            for (int j = k; j < k + t; j++) {
+                int U = a_star[j];
+                int V = a_star[j + t];
+                a_star[j] = (U + V) % p;
+                if (a_star[j] < 0) a_star[j] += p;
+                int W = (U - V) % p;
+                if (W < 0) W += p;
+                a_star[j + t] = (W * S) % p;
+                if (a_star[j + t] < 0) a_star[j + t] += p;
+            }
+            k += 2 * t;
+        }
+        t *= 2;
+        m /= 2;
     }
-
-    return a;
+    for (int i = 0; i < n; i++) {
+        a_star[i] = (a_star[i] * inv_n) % p;
+        if (a_star[i] < 0) a_star[i] += p;
+    }
+    return a_star;
 }
+
 
 std::vector<int> FFT_convolution(std::vector<int> a, std::vector<int> b){
     int n = std::max(a.size(), b.size());
