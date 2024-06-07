@@ -54,29 +54,29 @@ int main() {
                 {4.0, 0.0}
         };
 
-        std::vector<int> int_sum = ntt(intVector, p);
+        std::vector<int> int_sum = intt(inverse_ntt, p);
         for (const auto& c : int_sum) {
             std::cout << c <<" ";
         }
         std::cout<<"NTT"<<std::endl;
-        std::vector<int> int_sum_2 = fast_ntt(intVector, p);
+        std::vector<int> int_sum_2 = fast_intt(inverse_ntt, p);
         for (const auto& c : int_sum_2) {
             std::cout << c <<" ";
         }
-        std::cout<<"fast NTT"<<std::endl;
-        int num_threads = 10;
-        std::vector<int> int_sum_3 = ntt_parallel(intVector, p, num_threads);
-        for (const auto& c : int_sum_3) {
-            std::cout << c <<" ";
-        }
-        std::cout<<"parallel NTT with "<< num_threads<<" threads"<<std::endl;
+        // std::cout<<"fast NTT"<<std::endl;
+        // int num_threads = 10;
+        // std::vector<int> int_sum_3 = ntt_parallel(intVector, p, num_threads);
+        // for (const auto& c : int_sum_3) {
+        //     std::cout << c <<" ";
+        // }
+        // std::cout<<"parallel NTT with "<< num_threads<<" threads"<<std::endl;
 
-        std::vector<int> int_sum_4 = intVector;
-        fast_ntt_parallel(int_sum_4, p, num_threads);
-        for (const auto& c : int_sum_4) {
-            std::cout << c <<" ";
-        }
-        std::cout<<"parallel fast NTT with "<< num_threads<<" threads"<<std::endl;
+        // std::vector<int> int_sum_4 = intVector;
+        // fast_ntt_parallel(int_sum_4, p, num_threads);
+        // for (const auto& c : int_sum_4) {
+        //     std::cout << c <<" ";
+        // }
+        // std::cout<<"parallel fast NTT with "<< num_threads<<" threads"<<std::endl;
 
 
     }
