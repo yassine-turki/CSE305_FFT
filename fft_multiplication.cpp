@@ -96,15 +96,16 @@ bool is_prime(int p){
     return true;
 }
 
-std::vector<int> prime_fft_find(int n){
-    int k = 1;
+std::vector<int> prime_fft_find(int n){ 
+    // we transformed the algorithm for making sure that the 2n-th root exists
+    int k = 2;
     int p = n + 1;
     while (true){
         if (is_prime(p)){
             break;
         }
-        k += 1;
-        p += n;
+        k += 2;
+        p += 2 * n;
     }
     std::vector<int> prime_pair = {p, k};
     return prime_pair;
@@ -159,6 +160,46 @@ int find_generator(int p, int n){
     return g;
 }
 
+int find_omega(int p, int n){
+    int g = find_generator(p, n);
+    int k = (p - 1) / n;
+    return mod_exp(g, k, p);
+}
+
+int find_2n_root(int p, int n){
+    int g = find_generator(p, n);
+    int k = (p - 1) / n;
+    if (k % 2 == 0){
+        throw std::runtime_error("There is no 2n-th root of unity!");
+    }
+    return mod_exp(g, k / 2, p);
+}
+
+std::vector<int> ntt(std::vector<int> a, int p){
+    int n = a.size();
+    std::vector<int> a_star(n);
+    int psi = find_2n_root(p, n);
+    for (int i = 0; i < n; i++){
+        for (int j = 0; j < n; j++){
+            a_star[i] = (a_star[i] + a[j] * mod_exp(psi, 2 * i * j + j, p)) % p;
+        }
+    }
+    return a_star;
+}
+
+std::vector<int> intt(std::vector<int> a_star, int p){
+    int n = a_star.size();
+    std::vector<int> a(n);
+    int psi = find_2n_root(p, n);
+    int inv_psi = mod_exp(psi, 2 * n - 1, p);
+    for (int i = 0; i < n; i++){
+        for(int j = 0; j < n; j++){
+            a[i] = (a[i] + a_star[j] * mod_exp(inv_psi, 2 * i * j + j, p)) % p;
+        }
+        a[i] /= n;
+    }
+    return a;
+}
 
 std::vector<int> Radix2FFT_int(std::vector<int> P, int p, int omega) {
     int N = P.size();
