@@ -239,7 +239,6 @@ std::vector<int> fast_ntt(std::vector<int> a, int p) {
     }
 
     int psi = find_2n_roots(p, n)[0];
-    std::cout<<"Psi in fast_ntt is "<<psi<<std::endl;
     std::vector<int> u(n / 2), v(n / 2);
     for (int i = 0; i < n / 2; i++) {
         u[i] = a[2 * i];
@@ -291,10 +290,11 @@ std::vector<int> fast_intt(std::vector<int> a_star, int p) {
     std::vector<int> a(n);
 
     for (int i = 0; i < n / 2; i++) {
-        a[2 * i] = ((u[i] + v[i]) * inv_psi) % p;
-        a[2 * i] = (a[2 * i] * inv_n) % p;
-        a[2 * i + 1] = ((u[i] - v[i]) * inv_psi) % p;
-        a[2 * i + 1] = (a[2 * i + 1] * inv_n) % p;
+        a[i] = (u[i] + t * v[i]) % p;
+        if (a[i] < 0) a[i] += p;
+        a[i + n / 2] = (u[i] - t * v[i]) % p;
+        if (a[i + n / 2] < 0) a[i + n / 2] += p;
+        t = (t * mod_exp(inv_psi, 2, p)) % p;
     }
 
     return a;
@@ -313,4 +313,111 @@ std::vector<int> FFT_convolution(std::vector<int> a, std::vector<int> b){
         c_star[i] = (a_star[i] * b_star[i]) % p;
     }
     return fast_intt(c_star, p);
+}
+
+
+
+/*------------------------------------Parallel NTT ------------------------------------*/
+
+void compute_ntt_segment(const std::vector<int>& a, std::vector<int>& a_star, int p, int psi, size_t start_index, size_t num_threads, int n, std::mutex& mtx) {
+    for (size_t i = start_index; i < n; i += num_threads) {
+        int sum = 0;
+        for (size_t j = 0; j < n; ++j) {
+            sum = (sum + a[j] * mod_exp(psi, 2 * i * j + j, p)) % p;
+        }
+        std::lock_guard<std::mutex> lock(mtx);
+        a_star[i] = sum;
+    }
+}
+
+std::vector<int> ntt_parallel(const std::vector<int>& a, int p, size_t num_threads) {
+    int n = a.size();
+    if (num_threads == 1) {
+        return ntt(a, p);
+    }
+
+    std::vector<int> a_star(n);
+    std::vector<std::thread> threads;
+    threads.reserve(num_threads - 1);
+    std::mutex mtx;
+
+    int psi = find_2n_roots(p, n)[0];
+
+    for (size_t i = 1; i < num_threads; ++i) {
+        threads.emplace_back(compute_ntt_segment, std::cref(a), std::ref(a_star), p, psi, i, num_threads, n, std::ref(mtx));
+    }
+    compute_ntt_segment(a, a_star, p, psi, 0, num_threads, n, mtx);
+
+    for (auto& th : threads) {
+        th.join();
+    }
+
+    return a_star;
+}
+
+/*------------------------------------Parallel NTT Cooley ------------------------------------*/
+
+void split_data_NTT(const std::vector<int>& a, std::vector<int>& u, std::vector<int>& v, size_t start, size_t end) {
+    for (size_t i = start; i < end; ++i) {
+        u[i] = a[2 * i];
+        v[i] = a[2 * i + 1];
+    }
+}
+
+void combine_results_NTT(std::vector<int>& a, const std::vector<int>& u, const std::vector<int>& v, int p, int psi, size_t n, size_t start, size_t end) {
+    int t = mod_exp(psi, 2 * start+1, p);
+    int psi_power = mod_exp(psi, 2, p); // psi squared
+    for (size_t i = start; i < end; ++i) {
+        a[i] = (u[i] + t * v[i]) % p;
+        if (a[i] < 0) a[i] += p;
+        a[i + n / 2] = (u[i] - t * v[i]) % p;
+        if (a[i + n / 2] < 0) a[i + n / 2] += p;
+        t = (t * psi_power) % p;
+    }
+}
+
+void fast_ntt_parallel(std::vector<int>& a, int p, size_t num_threads) {
+    size_t n = a.size();
+    if (!is_power_of_two(n)) {
+        std::cout << "The input size " << n << " is not a power of 2! Resizing input" << std::endl;
+        n = next_power_of_two(n);
+        a.resize(n);
+    }
+
+    if (num_threads == 1 || n == 1) {
+        a = fast_ntt(a, p);
+        return;
+    }
+
+    int psi = find_2n_roots(p, n)[0];
+    std::vector<int> u(n / 2), v(n / 2);
+
+    size_t split_threads = std::min(num_threads, n / 2);
+    size_t chunk_size = (n / 2 + split_threads - 1) / split_threads;
+    std::vector<std::thread> split_threads_list;
+
+    for (size_t t = 0; t < split_threads; ++t) {
+        size_t start = t * chunk_size;
+        size_t end = std::min(start + chunk_size, n / 2);
+        split_threads_list.emplace_back(split_data_NTT, std::cref(a), std::ref(u), std::ref(v), start, end);
+    }
+
+    for (auto& th : split_threads_list) {
+        th.join();
+    }
+    std::thread t1(fast_ntt_parallel, std::ref(u), p, num_threads / 2);
+    std::thread t2(fast_ntt_parallel, std::ref(v), p, num_threads / 2);
+    t1.join();
+    t2.join();
+
+    split_threads_list.clear();
+    for (size_t t = 0; t < split_threads; ++t) {
+        size_t start = t * chunk_size;
+        size_t end = std::min(start + chunk_size, n / 2);
+        split_threads_list.emplace_back(combine_results_NTT, std::ref(a), std::cref(u), std::cref(v), p, psi, n, start, end);
+    }
+
+    for (auto& th : split_threads_list) {
+        th.join();
+    }
 }
