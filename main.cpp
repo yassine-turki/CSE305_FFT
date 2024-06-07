@@ -11,10 +11,13 @@
 #include <mutex>
 #include "fft_multiplication.cpp"
 
+
 #define M_PI 3.14159265358979323846
 
 typedef std::complex<double> complex;
 
+
+/*------------------------------------Data functions ------------------------------------*/
 
 std::vector<complex> get_weather_data(std::string file_path) {
     std::ifstream file(file_path); // Open the CSV file
@@ -64,7 +67,7 @@ std::vector<complex> generate_synthetic_data(int num_points) {
 }
 
 
-/////////////////////////////////////////// Testing functions /////////////////////////////////////////////
+/*------------------------------------Testing functions ------------------------------------*/
 
 std::vector<complex> generate_dummy_data() {
     return {1, 2, 3, 4};
@@ -169,13 +172,51 @@ void test_radix2(std::vector<complex> data, int num_threads) {
 
 int main() {
 
-    bool test_alex = 0;
+    bool test_mult = 1;
     std::string file_path;
     std::vector<complex> weather_data;
-    if(test_alex){
-//         file_path = "data/natural_gas_co2_emissions_for_electric_power_sector.csv";
-         file_path = "data/Paris_data.csv";
-         weather_data = get_weather_data(file_path);
+    if(test_mult){
+
+        std::vector<int> intVector = {1, 2, 3, 4};
+        std::vector<int> intVector2 = {5, 6, 7, 8};
+        int p = 7681;
+        std::vector<int> inverse_ntt = {2489, 7489, 6478, 6607};
+
+        std::vector<complex> complexVector = {
+                {1.0, 2.0},
+                {3.0, 4.0},
+                {5.0, 6.0},
+                {7.0, 8.0}
+        };
+        std::vector<complex> complexVector2 = {
+                {1.0, 2.0},
+                {3.0, 4.0},
+                {5.0, 6.0},
+                {7.0, 8.0}
+        };
+
+        std::vector<complex> complexVector3 = {
+                {1.0, 0.0},
+                {2.0, 0.0},
+                {3.0, 0.0},
+                {4.0, 0.0}
+        };
+        std::vector<complex> complexVector4 = {
+                {1.0, 0.0},
+                {2.0, 0.0},
+                {3.0, 0.0},
+                {4.0, 0.0}
+        };
+
+        std::vector<int> int_sum = ntt(intVector, p);
+        for (const auto& c : int_sum) {
+            std::cout << c <<" ";
+        }
+        std::cout<<"FFT"<<std::endl;
+        std::vector<int> int_sum_2 = fast_ntt(intVector, p);
+        for (const auto& c : int_sum_2) {
+            std::cout << c <<" ";
+        }
 
     }
     else {
@@ -199,46 +240,6 @@ int main() {
         test_radix2(weather_data, num_threads);
     }
 
-    std::vector<int> intVector = {1, 2, 3, 4};
-    std::vector<int> intVector2 = {5, 6, 7, 8};
-    int p = 7681;
-    std::vector<int> inverse_ntt = {2489, 7489, 6478, 6607};
-
-    std::vector<complex> complexVector = {
-        {1.0, 2.0}, 
-        {3.0, 4.0}, 
-        {5.0, 6.0}, 
-        {7.0, 8.0}
-    };
-    std::vector<complex> complexVector2 = {
-        {1.0, 2.0}, 
-        {3.0, 4.0}, 
-        {5.0, 6.0}, 
-        {7.0, 8.0}
-    };
-
-    std::vector<complex> complexVector3 = {
-        {1.0, 0.0}, 
-        {2.0, 0.0}, 
-        {3.0, 0.0}, 
-        {4.0, 0.0}
-    };
-    std::vector<complex> complexVector4 = {
-        {1.0, 0.0}, 
-        {2.0, 0.0}, 
-        {3.0, 0.0}, 
-        {4.0, 0.0}
-    };
-
-    std::vector<int> int_sum = ntt(intVector2, p);
-    for (const auto& c : int_sum) {
-        std::cout << c <<" ";
-    }
-    std::cout<<"FFT"<<std::endl;
-    std::vector<int> int_sum_2 = fast_ntt(intVector2, p);
-    for (const auto& c : int_sum_2) {
-        std::cout << c <<" ";
-    }
 
     return 0;
 }
