@@ -166,19 +166,23 @@ int find_omega(int p, int n){
     return mod_exp(g, k, p);
 }
 
-int find_2n_root(int p, int n){
+std::vector<int> find_2n_roots(int p, int n){
     int g = find_generator(p, n);
     int k = (p - 1) / n;
     if (k % 2 != 0){
         throw std::runtime_error("There is no 2n-th root of unity!");
     }
-    return mod_exp(g, k / 2, p);
+    int root_1 = mod_exp(g, k / 2, p);
+    int root_2 = mod_exp(root_1, 2 * n - 1, p);
+    std::vector<int> roots = {root_1, root_2};
+    return roots;
+    
 }
 
 std::vector<int> ntt(std::vector<int> a, int p){
     int n = a.size();
     std::vector<int> a_star(n);
-    int psi = find_2n_root(p, n);
+    int psi = find_2n_roots(p, n)[0];
     for (int i = 0; i < n; i++){
         for (int j = 0; j < n; j++){
             a_star[i] = (a_star[i] + a[j] * mod_exp(psi, 2 * i * j + j, p)) % p;
@@ -190,7 +194,7 @@ std::vector<int> ntt(std::vector<int> a, int p){
 std::vector<int> intt(std::vector<int> a_star, int p){
     int n = a_star.size();
     std::vector<int> a(n);
-    int psi = find_2n_root(p, n);
+    int psi = find_2n_roots(p, n)[0];
     int inv_psi = mod_exp(psi, 2 * n - 1, p);
     int inv_n = mod_exp(n, p - 2, p);
     for (int i = 0; i < n; i++){
@@ -229,7 +233,7 @@ std::vector<int> fast_ntt(std::vector<int> a, int p) {
         return a;
     }
 
-    int psi = find_2n_root(p, n);
+    int psi = find_2n_roots(p, n)[0];
     std::vector<int> u(n / 2), v(n / 2);
     for (int i = 0; i < n / 2; i++) {
         u[i] = a[2 * i];
@@ -296,7 +300,7 @@ std::vector<int> fast_intt(std::vector<int> a_star, int p) {
         n = a_star.size();
     }
 
-    int psi = find_2n_root(p, n);
+    int psi = find_2n_roots(p, n)[0];
     int inv_psi = mod_exp(psi, 2 * n - 1, p);
     int inv_n = mod_exp(n, p - 2, p);
 
