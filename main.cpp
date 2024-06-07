@@ -54,12 +54,12 @@ int main() {
                 {4.0, 0.0}
         };
 
-        std::vector<int> int_sum = ntt(intVector, p);
+        std::vector<int> int_sum = intt(inverse_ntt, p);
         for (const auto& c : int_sum) {
             std::cout << c <<" ";
         }
         std::cout<<"FFT"<<std::endl;
-        std::vector<int> int_sum_2 = fast_ntt(intVector, p);
+        std::vector<int> int_sum_2 = fast_intt(inverse_ntt, p);
         for (const auto& c : int_sum_2) {
             std::cout << c <<" ";
         }

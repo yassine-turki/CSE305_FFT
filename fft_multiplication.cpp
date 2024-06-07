@@ -145,20 +145,22 @@ int find_generator(int p, int n){
     std::vector<int> prime_factors = prime_decomposition(k);
     auto it = std::find(prime_factors.begin(), prime_factors.end(), 2);
     if (it == prime_factors.end()){prime_factors.push_back(2);}
-    bool found = false;
-    int g = 0;
-    while(!found){
-        g = rand() % (p - 1) + 1;
-        found = true;
+    for (int i = 1; i < p; i++){
+        int ct = 0;
         for (int prime: prime_factors){
-            int y = mod_exp(g, (p - 1) / prime, p);
+            int y = mod_exp(i, (p - 1) / prime, p);
             if (y == 1){
-                found = false;
+                break;
+            }
+            ct += 1;
+            if (ct == prime_factors.size()){
+                return i;
             }
         }
     }
-    return g;
+    return 0;
 }
+
 
 int find_omega(int p, int n){
     int g = find_generator(p, n);
@@ -172,17 +174,20 @@ std::vector<int> find_2n_roots(int p, int n){
     if (k % 2 != 0){
         throw std::runtime_error("There is no 2n-th root of unity!");
     }
+    if (g == 0){
+        throw std::runtime_error("There is no generator!");
+    }
     int root_1 = mod_exp(g, k / 2, p);
     int root_2 = mod_exp(root_1, 2 * n - 1, p);
     std::vector<int> roots = {root_1, root_2};
     return roots;
-    
 }
 
 std::vector<int> ntt(std::vector<int> a, int p){
     int n = a.size();
     std::vector<int> a_star(n);
     int psi = find_2n_roots(p, n)[0];
+    std::cout<<"Psi in ntt is "<<psi<<std::endl;
     for (int i = 0; i < n; i++){
         for (int j = 0; j < n; j++){
             a_star[i] = (a_star[i] + a[j] * mod_exp(psi, 2 * i * j + j, p)) % p;
@@ -194,8 +199,7 @@ std::vector<int> ntt(std::vector<int> a, int p){
 std::vector<int> intt(std::vector<int> a_star, int p){
     int n = a_star.size();
     std::vector<int> a(n);
-    int psi = find_2n_roots(p, n)[0];
-    int inv_psi = mod_exp(psi, 2 * n - 1, p);
+    int inv_psi = find_2n_roots(p, n)[1];
     int inv_n = mod_exp(n, p - 2, p);
     for (int i = 0; i < n; i++){
         for(int j = 0; j < n; j++){
@@ -212,6 +216,7 @@ std::vector<int> convolution_ntt(std::vector<int> a, std::vector<int> b){
     b.resize(n);
     std::vector<int> pair = prime_fft_find(n);
     int p = pair[0];
+    //std::vector<int> roots = find_2n_roots(p, n);
     std::vector<int> a_star = ntt(a, p);
     std::vector<int> b_star = ntt(b, p);
     std::vector<int> c_star(n);
@@ -234,6 +239,7 @@ std::vector<int> fast_ntt(std::vector<int> a, int p) {
     }
 
     int psi = find_2n_roots(p, n)[0];
+    std::cout<<"Psi in fast_ntt is "<<psi<<std::endl;
     std::vector<int> u(n / 2), v(n / 2);
     for (int i = 0; i < n / 2; i++) {
         u[i] = a[2 * i];
@@ -255,38 +261,6 @@ std::vector<int> fast_ntt(std::vector<int> a, int p) {
     return a_star;
 }
 
-// std::vector<int> fast_ntt_2(std::vector<int> a, int p){
-//     int n = a.size();
-//     if(!is_power_of_two(n)){
-//         std::cout << "The input size " << n << " is not a power of 2! Resizing input" << std::endl;
-//         a.resize(next_power_of_two(a.size()));
-//         n = a.size();
-//     }
-
-//     if (n == 1) {
-//         return a;
-//     }
-
-//     int psi = find_2n_root(p, n);
-
-//     int t = n;
-//     for (int m = 1; m < n; m = 2 * m){
-//         t = t / 2;
-//         for (int i = 0; i < m; i++){
-//             int j_1 = 2 * i * t;
-//             int j_2 = j_1 + t - 1;
-//             int S = mod_exp(psi, 2 * n - m - i, p);
-//             for (int j = j_1; j < j_2; j++){
-//                 int u = a[j];
-//                 int v = a[j + t] * S;
-//                 a[j] = (u + v) % p;
-//                 a[j + t] = (u - v) % p;
-//             }
-//         }
-//     }
-//     return a;
-// }
-
 
 std::vector<int> fast_intt(std::vector<int> a_star, int p) {
     int n = a_star.size();
@@ -300,8 +274,7 @@ std::vector<int> fast_intt(std::vector<int> a_star, int p) {
         n = a_star.size();
     }
 
-    int psi = find_2n_roots(p, n)[0];
-    int inv_psi = mod_exp(psi, 2 * n - 1, p);
+    int inv_psi = find_2n_roots(p, n)[1];
     int inv_n = mod_exp(n, p - 2, p);
 
     std::vector<int> u_star(n / 2), v_star(n / 2);
