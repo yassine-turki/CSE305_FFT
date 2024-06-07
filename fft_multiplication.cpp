@@ -273,7 +273,13 @@ std::vector<int> fast_intt(std::vector<int> a_star, int p) {
         n = a_star.size();
     }
 
+    int psi = find_2n_roots(p, n)[0];
     int inv_psi = find_2n_roots(p, n)[1];
+    std::cout<<"Psi in fast_intt is "<<psi<<std::endl;
+    std::cout<<"Inv_psi in fast_intt is "<<inv_psi<<std::endl;
+    if (((inv_psi * psi) % p) != 1){
+        throw std::runtime_error("The roots are not well computed");
+    }
     int inv_n = mod_exp(n, p - 2, p);
 
     std::vector<int> u_star(n / 2), v_star(n / 2);
@@ -290,9 +296,9 @@ std::vector<int> fast_intt(std::vector<int> a_star, int p) {
     std::vector<int> a(n);
 
     for (int i = 0; i < n / 2; i++) {
-        a[2 * i] = (((u[i] + v[i]) * inv_psi) * inv_n) % p;
+        a[2 * i] = (((u[i] + v[i]) % p * t) % p * inv_n) % p;
         if (a[2 * i] < 0) a[2 * i] += p;
-        a[2 * i + 1] = (((u[i] - v[i]) * inv_psi) * inv_n) % p;
+        a[2 * i + 1] = (((u[i] - v[i]) % p * t) % p * inv_n) % p;
         if (a[2 * i + 1] < 0) a[2 * i + 1] += p;
         t = (t * mod_exp(inv_psi, 2, p)) % p;
     }
