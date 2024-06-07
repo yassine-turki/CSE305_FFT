@@ -169,7 +169,7 @@ int find_omega(int p, int n){
 int find_2n_root(int p, int n){
     int g = find_generator(p, n);
     int k = (p - 1) / n;
-    if (k % 2 == 0){
+    if (k % 2 != 0){
         throw std::runtime_error("There is no 2n-th root of unity!");
     }
     return mod_exp(g, k / 2, p);
@@ -178,6 +178,8 @@ int find_2n_root(int p, int n){
 std::vector<int> ntt(std::vector<int> a, int p){
     int n = a.size();
     std::vector<int> a_star(n);
+    // std::vector<int> pair = prime_fft_find(n);
+    // int p = pair[0];
     int psi = find_2n_root(p, n);
     for (int i = 0; i < n; i++){
         for (int j = 0; j < n; j++){
@@ -190,15 +192,33 @@ std::vector<int> ntt(std::vector<int> a, int p){
 std::vector<int> intt(std::vector<int> a_star, int p){
     int n = a_star.size();
     std::vector<int> a(n);
+    // std::vector<int> pair = prime_fft_find(n);
+    // int p = pair[0];
     int psi = find_2n_root(p, n);
     int inv_psi = mod_exp(psi, 2 * n - 1, p);
+    int inv_n = mod_exp(n, p - 2, p);
     for (int i = 0; i < n; i++){
         for(int j = 0; j < n; j++){
-            a[i] = (a[i] + a_star[j] * mod_exp(inv_psi, 2 * i * j + j, p)) % p;
+            a[i] = (a[i] + a_star[j] * mod_exp(inv_psi, 2 * i * j + i, p)) % p;
         }
-        a[i] /= n;
+        a[i] = (a[i] * inv_n) % p;
     }
     return a;
+}
+
+std::vector<int> convolution_ntt(std::vector<int> a, std::vector<int> b){
+    int n = std::max(a.size(), b.size());
+    a.resize(n);
+    b.resize(n);
+    std::vector<int> pair = prime_fft_find(n);
+    int p = pair[0];
+    std::vector<int> a_star = ntt(a, p);
+    std::vector<int> b_star = ntt(b, p);
+    std::vector<int> c_star(n);
+    for (int i = 0; i < n; i++){
+        c_star[i] = (a_star[i] * b_star[i]) % p;
+    }
+    return intt(c_star, p);
 }
 
 std::vector<int> Radix2FFT_int(std::vector<int> P, int p, int omega) {
