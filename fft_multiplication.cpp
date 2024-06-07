@@ -290,10 +290,10 @@ std::vector<int> fast_intt(std::vector<int> a_star, int p) {
     std::vector<int> a(n);
 
     for (int i = 0; i < n / 2; i++) {
-        a[i] = (u[i] + t * v[i]) % p;
-        if (a[i] < 0) a[i] += p;
-        a[i + n / 2] = (u[i] - t * v[i]) % p;
-        if (a[i + n / 2] < 0) a[i + n / 2] += p;
+        a[2 * i] = (((u[i] + v[i]) * inv_psi) * inv_n) % p;
+        if (a[2 * i] < 0) a[2 * i] += p;
+        a[2 * i + 1] = (((u[i] - v[i]) * inv_psi) * inv_n) % p;
+        if (a[2 * i + 1] < 0) a[2 * i + 1] += p;
         t = (t * mod_exp(inv_psi, 2, p)) % p;
     }
 
