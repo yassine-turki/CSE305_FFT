@@ -259,52 +259,6 @@ std::vector<int> fast_ntt(std::vector<int> a, int p) {
     return a_star;
 }
 
-
-// std::vector<int> fast_intt(std::vector<int> a_star, int p) {
-//     int n = a_star.size();
-//     if (n == 1) {
-//         return a_star;
-//     }
-
-//     if (!is_power_of_two(n)) {
-//         std::cout << "The input size " << n << " is not a power of 2! Resizing input" << std::endl;
-//         a_star.resize(next_power_of_two(n));
-//         n = a_star.size();
-//     }
-
-//     int psi = find_2n_roots(p, n)[0];
-//     int inv_psi = find_2n_roots(p, n)[1];
-//     // std::cout<<"Psi in fast_intt is "<<psi<<std::endl;
-//     // std::cout<<"Inv_psi in fast_intt is "<<inv_psi<<std::endl;
-//     if (((inv_psi * psi) % p) != 1){
-//         throw std::runtime_error("The roots are not well computed");
-//     }
-//     int inv_n = mod_exp(n, p - 2, p);
-
-//     std::vector<int> u_star(n / 2), v_star(n / 2);
-
-//     for (int j = 0; j < n / 2; j++) {
-//         u_star[j] = a_star[j];
-//         v_star[j] = a_star[n / 2 + j];
-//     }
-
-//     std::vector<int> u = fast_intt(u_star, p);
-//     std::vector<int> v = fast_intt(v_star, p);
-
-//     int t = 1;
-//     std::vector<int> a(n);
-
-//     for (int i = 0; i < n / 2; i++) {
-//         a[2 * i] = (((u[i] + v[i]) % p * t) % p * inv_n) % p;
-//         if (a[2 * i] < 0) a[2 * i] += p;
-//         a[2 * i + 1] = (((u[i] - v[i]) % p * t) % p * inv_n) % p;
-//         if (a[2 * i + 1] < 0) a[2 * i + 1] += p;
-//         t = (t * mod_exp(inv_psi, 2, p)) % p;
-//     }
-
-//     return a;
-// }
-
 unsigned int reverse_bits(unsigned int x, int num_bits) {
     unsigned int result = 0;
     for (int i = 0; i < num_bits; i++) {
@@ -312,6 +266,22 @@ unsigned int reverse_bits(unsigned int x, int num_bits) {
         x >>= 1;
     }
     return result;
+}
+
+std::vector<int> reverse_bit_order_array(std::vector<int> arr){
+    int n = arr.size();
+    int num_bits = std::log2(n);
+    std::vector<unsigned int> new_positions(n);
+    for (unsigned int i = 0; i < n; i++){
+        unsigned int pos = reverse_bits(i, num_bits);
+        new_positions[i] = pos;
+    }
+    std::vector<int> reversed_bit_order_arr(n);
+    for (int i = 0; i < n; i++){
+        unsigned int new_pos = new_positions[i];
+        reversed_bit_order_arr[new_pos] = arr[i];
+    }
+    return reversed_bit_order_arr;
 }
 
 std::vector<int> compute_powers_of_psi(int psi, int n, int p) {
@@ -343,6 +313,8 @@ std::vector<int> fast_intt(std::vector<int> a_star, int p) {
         a_star.resize(next_power_of_two(n));
         n = a_star.size();
     }
+
+    a_star = reverse_bit_order_array(a_star);
 
     std::vector<int> roots = find_2n_roots(p, n);
     int psi = roots[0];
