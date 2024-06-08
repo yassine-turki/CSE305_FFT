@@ -297,7 +297,6 @@ std::vector<int> compute_powers_of_psi(int psi, int n, int p) {
 }
 
 std::vector<int> fast_intt(std::vector<int> a_star, int p) {
-    auto start = std::chrono::system_clock::now();
     int n = a_star.size();
     if (n == 1) {
         return a_star;
@@ -345,15 +344,12 @@ std::vector<int> fast_intt(std::vector<int> a_star, int p) {
         a_star[i] = (a_star[i] * inv_n) % p;
         if (a_star[i] < 0) a_star[i] += p;
     }
-    auto end = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsed_seconds_parallel = end - start;
-    std::cout << "Time taken for fast_intt without threads: " << elapsed_seconds_parallel.count() << "s\n";
 
     return a_star;
 }
 
 
-std::vector<int> FFT_convolution(std::vector<int> a, std::vector<int> b){
+std::vector<int> convolution_fast(std::vector<int> a, std::vector<int> b){
     int n = std::max(a.size(), b.size());
     a.resize(n);
     b.resize(n);
@@ -592,7 +588,6 @@ void compute_segment_fast_intt(int start, int end, int t, int p, const std::vect
 }
 
 std::vector<int> fast_intt_parallel(std::vector<int> a_star, int p, int num_threads) {
-    auto start_parallel = std::chrono::system_clock::now();
     int n = a_star.size();
     if (n == 1) {
         return a_star;
@@ -661,9 +656,67 @@ std::vector<int> fast_intt_parallel(std::vector<int> a_star, int p, int num_thre
         thread.join();
     }
 
-    auto end_parallel = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsed_seconds_parallel = end_parallel - start_parallel;
-    std::cout << "Time taken for parallel fast_intt with " << num_threads << " threads: " << elapsed_seconds_parallel.count() << "s\n";
-
     return a_star;
+}
+
+/*------------------------------------Parallel naive convolution ------------------------------------*/
+
+void compute_convolution_segment(const std::vector<int>& a, const std::vector<int>& b, std::vector<int>& c, size_t start_index, size_t num_threads, int n, int p, std::mutex& mtx){
+    for (size_t k = start_index; k < n ; k += num_threads) {
+        c[k] = (a[k] * b[k]) % p;
+    }
+}
+
+std::vector<int> convolution_parallel(std::vector<int> a, std::vector<int> b, int num_threads){
+    int n = std::max(a.size(), b.size());
+    a.resize(n);
+    b.resize(n);
+    std::vector<int> pair = prime_fft_find(n);
+    int p = pair[0];
+    std::vector<int> a_star = ntt_parallel(a, p, num_threads / 2);
+    std::vector<int> b_star = ntt_parallel(b, p, num_threads / 2);
+    std::vector<int> c_star(n);
+
+    std::vector<std::thread> threads;
+    threads.reserve(num_threads - 1);
+    std::mutex mtx;
+
+    for (size_t i = 1; i < num_threads; ++i) {
+        threads.emplace_back(compute_convolution_segment, std::cref(a_star), std::cref(b_star), std::ref(c_star), i, num_threads, n, p, std::ref(mtx));
+    }
+    compute_convolution_segment(a_star, b_star, c_star, 0, num_threads, n, p, mtx);
+
+    for (auto& th : threads) {
+        th.join();
+    }
+
+    return intt_parallel(c_star, p, num_threads);
+}
+
+
+/*------------------------------------Parallel fast convolution ------------------------------------*/
+
+std::vector<int> convolution_fast_parallel(std::vector<int> a, std::vector<int> b, int num_threads){
+    int n = std::max(a.size(), b.size());
+    a.resize(n);
+    b.resize(n);
+    std::vector<int> pair = prime_fft_find(n);
+    int p = pair[0];
+    fast_ntt_parallel(a, p, num_threads / 2);
+    fast_ntt_parallel(b, p, num_threads / 2);
+    std::vector<int> c(n);
+
+    std::vector<std::thread> threads;
+    threads.reserve(num_threads - 1);
+    std::mutex mtx;
+
+    for (size_t i = 1; i < num_threads; ++i) {
+        threads.emplace_back(compute_convolution_segment, std::cref(a), std::cref(b), std::ref(c), i, num_threads, n, p, std::ref(mtx));
+    }
+    compute_convolution_segment(a, b, c, 0, num_threads, n, p, mtx);
+
+    for (auto& th : threads) {
+        th.join();
+    }
+    return fast_intt_parallel(c, p, num_threads);
 }
