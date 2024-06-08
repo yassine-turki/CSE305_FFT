@@ -18,7 +18,8 @@ typedef std::complex<double> complex;
 
 int main() {
 
-    bool test_mult = 1;
+    bool test_mult = 0;
+    bool test_fft = 0;
     std::string file_path;
     std::vector<complex> weather_data;
     if(test_mult){
@@ -59,7 +60,7 @@ int main() {
             std::cout << c <<" ";
         }
         std::cout<<"NTT"<<std::endl;
-        std::vector<int> int_arr_2 = FFT_convolution(intVector, intVector2);
+        std::vector<int> int_arr_2 = convolution_ntt(intVector, intVector2);
         for (const auto& c : int_arr_2) {
             std::cout << c <<" ";
         }
@@ -80,7 +81,7 @@ int main() {
 
 
     }
-    else {
+    else if(test_fft) {
 
         bool use_dummy_data = 0; // Test it on {1, 2, 3, 4}
         bool use_synthetic_data = 0; // Test it on synthetic data (sine)
@@ -99,6 +100,11 @@ int main() {
 
         test_naive_dft(weather_data, num_threads);
         test_radix2(weather_data, num_threads);
+    }
+    else{
+        size_t num_threads = 5;
+        std::vector<int> test_values = {29, 97, 100, 101, 999983, 1000003, 36, 144, 185, 17};
+        test_is_prime(test_values, num_threads);
     }
 
 

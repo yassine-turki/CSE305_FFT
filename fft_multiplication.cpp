@@ -11,6 +11,7 @@
 #include <mutex>
 #include <set>
 #include <random>
+#include <atomic>
 #include "fft.cpp"
 
 
@@ -95,6 +96,40 @@ bool is_prime(int p){
     }
     return true;
 }
+
+/* ------------------------------------Parallel is_prime ------------------------------------ */
+void is_prime_thread(int p, int start, int end, std::atomic<bool>& prime) {
+    for (int i = start; i <= end; ++i) {
+        if (p % i == 0) {
+            prime = false;
+            break;
+        }
+    }
+}
+
+bool is_prime_parallel(int p, size_t num_threads) {
+    if (p == 0 || p == 1) return false;
+    if (p == 2) return true;
+
+    int root = std::ceil(std::sqrt(p));
+    std::atomic<bool> prime(true);
+
+    std::vector<std::thread> threads(num_threads-1);
+    int chunk_size = root / num_threads;
+    int start_block = 2;
+    for (size_t i = 0; i < num_threads - 1; ++i) {
+        int end_block = start_block + chunk_size - 1;
+        threads[i] = std::thread(is_prime_thread, p, start_block, end_block, std::ref(prime));
+        start_block = end_block + 1;
+    }
+    is_prime_thread(p, start_block, root, prime);
+
+    for (auto& t : threads) {
+        t.join();
+    }
+    return prime;
+}
+
 
 std::vector<int> prime_fft_find(int n){ 
     // we transformed the algorithm for making sure that the 2n-th root exists

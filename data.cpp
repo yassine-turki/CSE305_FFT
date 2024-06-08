@@ -13,6 +13,10 @@ typedef std::complex<double> complex;
 
 /*------------------------------------Data functions ------------------------------------*/
 
+std::vector<complex> generate_dummy_data() {
+    return {1, 2, 3, 4};
+}
+
 std::vector<complex> get_weather_data(std::string file_path) {
     std::ifstream file(file_path); // Open the CSV file
     if (!file.is_open()) {

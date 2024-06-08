@@ -19,9 +19,7 @@ typedef std::complex<double> complex;
 
 /*------------------------------------Testing functions ------------------------------------*/
 
-std::vector<complex> generate_dummy_data() {
-    return {1, 2, 3, 4};
-}
+
 
 void test_naive_dft(std::vector<complex> data, int num_threads) {
     std::vector<complex> result_seq, result_parallel;
@@ -118,4 +116,24 @@ void test_radix2(std::vector<complex> data, int num_threads) {
 //    if(!error) {
 //        std::cout << "No errors found!" << std::endl;
 //    }
+}
+
+
+void test_is_prime(const std::vector<int>& test_values, size_t num_threads) {
+    for (int p : test_values) {
+        auto start = std::chrono::high_resolution_clock::now();
+        bool result_single = is_prime(p);
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> duration_single = end - start;
+
+        start = std::chrono::high_resolution_clock::now();
+        bool result_parallel = is_prime_parallel(p, num_threads);
+        end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> duration_parallel = end - start;
+
+        std::cout << "Testing number: " << p << "\n";
+        std::cout << "Single-threaded result: " << result_single << ", Time: " << duration_single.count() << " seconds\n";
+        std::cout << "Multi-threaded result with " << num_threads << " threads: "<<result_parallel << ", Time: " << duration_parallel.count() << " seconds\n";
+        std::cout << "--------------------------------------------------\n";
+    }
 }
