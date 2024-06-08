@@ -54,12 +54,12 @@ int main() {
                 {4.0, 0.0}
         };
 
-        std::vector<int> int_arr = intt(inverse_ntt, p);
+        std::vector<int> int_arr = convolution_ntt(intVector, intVector2);
         for (const auto& c : int_arr) {
             std::cout << c <<" ";
         }
         std::cout<<"NTT"<<std::endl;
-        std::vector<int> int_arr_2 = fast_intt(inverse_ntt, p);
+        std::vector<int> int_arr_2 = FFT_convolution(intVector, intVector2);
         for (const auto& c : int_arr_2) {
             std::cout << c <<" ";
         }
