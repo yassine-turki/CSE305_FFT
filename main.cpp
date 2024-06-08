@@ -102,9 +102,19 @@ int main() {
         test_radix2(weather_data, num_threads);
     }
     else{
+
+        // Test is_prime
+
+//        size_t num_threads = 5;
+//        std::vector<int> test_values = {29, 97, 100, 101, 999983, 1000003, 36, 144, 185, 17};
+//        test_is_prime(test_values, num_threads);
+
+// Test find_generator
+
         size_t num_threads = 5;
-        std::vector<int> test_values = {29, 97, 100, 101, 999983, 1000003, 36, 144, 185, 17};
-        test_is_prime(test_values, num_threads);
+        int n = 16;
+        int p = 7681;
+        test_find_generator(n, p, num_threads);
     }
 
 

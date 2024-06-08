@@ -137,3 +137,21 @@ void test_is_prime(const std::vector<int>& test_values, size_t num_threads) {
         std::cout << "--------------------------------------------------\n";
     }
 }
+
+
+void test_find_generator(int n, int p, size_t num_threads) {
+    auto start = std::chrono::high_resolution_clock::now();
+    int result_single = find_generator(n, p);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration_single = end - start;
+
+    start = std::chrono::high_resolution_clock::now();
+    int result_parallel = find_generator_parallel(n, p, num_threads);
+    end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration_parallel = end - start;
+
+    std::cout << "Testing n: " << n << ", p: " << p << "\n";
+    std::cout << "Single-threaded result: " << result_single << ", Time: " << duration_single.count() << " seconds\n";
+    std::cout << "Multi-threaded result with " << num_threads << " threads: "<<result_parallel << ", Time: " << duration_parallel.count() << " seconds\n";
+    std::cout << "--------------------------------------------------\n";
+}
