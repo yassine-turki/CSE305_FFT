@@ -270,15 +270,10 @@ unsigned int reverse_bits(unsigned int x, int num_bits) {
 std::vector<int> reverse_bit_order_array(std::vector<int> arr){
     int n = arr.size();
     int num_bits = std::log2(n);
-    std::vector<unsigned int> new_positions(n);
-    for (unsigned int i = 0; i < n; i++){
-        unsigned int pos = reverse_bits(i, num_bits);
-        new_positions[i] = pos;
-    }
     std::vector<int> reversed_bit_order_arr(n);
     for (int i = 0; i < n; i++){
-        unsigned int new_pos = new_positions[i];
-        reversed_bit_order_arr[new_pos] = arr[i];
+        unsigned int pos = reverse_bits(i, num_bits);
+        reversed_bit_order_arr[pos] = arr[i];
     }
     return reversed_bit_order_arr;
 }
@@ -302,6 +297,7 @@ std::vector<int> compute_powers_of_psi(int psi, int n, int p) {
 }
 
 std::vector<int> fast_intt(std::vector<int> a_star, int p) {
+    auto start = std::chrono::system_clock::now();
     int n = a_star.size();
     if (n == 1) {
         return a_star;
@@ -349,6 +345,10 @@ std::vector<int> fast_intt(std::vector<int> a_star, int p) {
         a_star[i] = (a_star[i] * inv_n) % p;
         if (a_star[i] < 0) a_star[i] += p;
     }
+    auto end = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_seconds_parallel = end - start;
+    std::cout << "Time taken for fast_intt without threads: " << elapsed_seconds_parallel.count() << "s\n";
+
     return a_star;
 }
 
@@ -519,3 +519,151 @@ std::vector<int> intt_parallel(std::vector<int>& a_star, int p, size_t num_threa
 
 /*------------------------------------Parallel INTT Gentleman Sande ------------------------------------*/
 
+void compute_reverse_bit_order_segment(const std::vector<int>& arr, std::vector<int>& reversed_bit_order_arr, size_t start_index, size_t num_threads, int n, int num_bits, std::mutex& mtx){
+    for (size_t k = start_index; k < n ; k += num_threads) {
+        unsigned int pos = reverse_bits(k, num_bits);
+        std::lock_guard<std::mutex> lock(mtx);
+        reversed_bit_order_arr[pos] = arr[k];
+    }
+}
+
+std::vector<int> reverse_bit_order_array_parallel(std::vector<int>& arr, int num_threads){
+    int n = arr.size();
+    int num_bits = std::log2(n);
+    std::vector<int> reversed_bit_order_arr(n);
+    std::vector<std::thread> threads;
+    threads.reserve(num_threads - 1);
+    std::mutex mtx;
+
+    for (size_t i = 1; i < num_threads; ++i) {
+        threads.emplace_back(compute_reverse_bit_order_segment, std::cref(arr), std::ref(reversed_bit_order_arr), i, num_threads, n, num_bits, std::ref(mtx));
+    }
+    compute_reverse_bit_order_segment(arr, reversed_bit_order_arr, 0, num_threads, n, num_bits, mtx);
+
+    for (auto& th : threads) {
+        th.join();
+    }
+
+    return reversed_bit_order_arr;
+}
+
+std::vector<int> compute_powers_of_psi_parallel(int psi, int n, int p, int num_threads) {
+    int num_bits = std::log2(n);
+    std::vector<int> powers(n);
+    std::vector<int> bit_reversed_powers(n);
+
+    powers[0] = 1;
+    for (int i = 1; i < n; i++) {
+        powers[i] = (powers[i - 1] * psi) % p;
+    }
+
+    std::vector<std::thread> threads;
+    threads.reserve(num_threads - 1);
+    std::mutex mtx;
+
+    for (size_t i = 1; i < num_threads; ++i) {
+        threads.emplace_back(compute_reverse_bit_order_segment, std::cref(powers), std::ref(bit_reversed_powers), i, num_threads, n, num_bits, std::ref(mtx));
+    }
+    compute_reverse_bit_order_segment(powers, bit_reversed_powers, 0, num_threads, n, num_bits, mtx);
+
+    for (auto& th : threads) {
+        th.join();
+    }
+
+    return bit_reversed_powers;
+}
+
+void compute_segment_fast_intt(int start, int end, int t, int p, const std::vector<int>& powers_inv_psi, std::vector<int>& a_star, std::mutex& mtx) {
+    for (int i = start; i < end; i++) {
+        int S = powers_inv_psi[end + i];
+        int k = 2 * t * i;
+        for (int j = k; j < k + t; j++) {
+            std::lock_guard<std::mutex> lock(mtx);
+            int U = a_star[j];
+            int V = a_star[j + t];
+            a_star[j] = (U + V) % p;
+            if (a_star[j] < 0) a_star[j] += p;
+            int W = (U - V) % p;
+            if (W < 0) W += p;
+            a_star[j + t] = (W * S) % p;
+            if (a_star[j + t] < 0) a_star[j + t] += p;
+        }
+    }
+}
+
+std::vector<int> fast_intt_parallel(std::vector<int> a_star, int p, int num_threads) {
+    auto start_parallel = std::chrono::system_clock::now();
+    int n = a_star.size();
+    if (n == 1) {
+        return a_star;
+    }
+
+    if (!is_power_of_two(n)) {
+        std::cout << "The input size " << n << " is not a power of 2! Resizing input" << std::endl;
+        a_star.resize(next_power_of_two(n));
+        n = a_star.size();
+    }
+
+    a_star = reverse_bit_order_array_parallel(a_star, num_threads);
+
+    std::vector<int> roots = find_2n_roots(p, n);
+    int psi = roots[0];
+    int inv_psi = roots[1];
+    if (((inv_psi * psi) % p) != 1){
+        throw std::runtime_error("The roots are not well computed");
+    }
+    int inv_n = mod_exp(n, p - 2, p);
+    std::vector<int> powers_inv_psi = compute_powers_of_psi_parallel(inv_psi, n, p, num_threads);
+    
+    int t = 1;
+    int m = n / 2;
+    std::mutex mtx;
+
+    while (m > 0) {
+        std::vector<std::thread> threads;
+        int segment_size = m / num_threads;
+
+        for (int i = 0; i < num_threads; i++) {
+            int start = i * segment_size;
+            int end = (i == num_threads - 1) ? m : start + segment_size;
+            threads.emplace_back(compute_segment_fast_intt, start, end, t, p, std::ref(powers_inv_psi), std::ref(a_star), std::ref(mtx));
+        }
+
+        for (auto& thread : threads) {
+            thread.join();
+        }
+
+        t *= 2;
+        m /= 2;
+    }
+
+    std::vector<std::thread> scaling_threads;
+    int segment_size = n / num_threads;
+
+    for (int i = 0; i < num_threads; i++) {
+        int start = i * segment_size;
+        int end;
+        if (i == num_threads - 1){
+            end = n;
+        }
+        else {
+            end = start + segment_size;
+        } 
+        scaling_threads.emplace_back([start, end, inv_n, p, &a_star]() {
+            for (int i = start; i < end; i++) {
+                a_star[i] = (a_star[i] * inv_n) % p;
+                if (a_star[i] < 0) a_star[i] += p;
+            }
+        });
+    }
+
+    for (auto& thread : scaling_threads) {
+        thread.join();
+    }
+
+    auto end_parallel = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_seconds_parallel = end_parallel - start_parallel;
+    std::cout << "Time taken for parallel fast_intt with " << num_threads << " threads: " << elapsed_seconds_parallel.count() << "s\n";
+
+    return a_star;
+}
