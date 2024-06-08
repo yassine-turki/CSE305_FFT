@@ -187,7 +187,6 @@ std::vector<int> ntt(std::vector<int> a, int p){
     int n = a.size();
     std::vector<int> a_star(n);
     int psi = find_2n_roots(p, n)[0];
-    std::cout<<"Psi in ntt is "<<psi<<std::endl;
     for (int i = 0; i < n; i++){
         for (int j = 0; j < n; j++){
             a_star[i] = (a_star[i] + a[j] * mod_exp(psi, 2 * i * j + j, p)) % p;
@@ -475,3 +474,48 @@ void fast_ntt_parallel(std::vector<int>& a, int p, size_t num_threads) {
         th.join();
     }
 }
+
+/*------------------------------------Parallel INTT ------------------------------------*/
+
+
+void compute_intt_segment(const std::vector<int>& a_star, std::vector<int>& a, size_t start_index, size_t num_threads, int n, int p, int inv_psi, int inv_n, std::mutex& mtx) {
+    for (size_t k = start_index; k < n ; k += num_threads) {
+        int sum = 0;
+        for (size_t j = 0; j < n; ++j) {
+            sum = (sum + a_star[j] * mod_exp(inv_psi, 2 * k * j + k, p)) % p;
+        }
+        std::lock_guard<std::mutex> lock(mtx);
+        a[k] = (sum * inv_n) % p;
+    }
+}
+
+std::vector<int> intt_parallel(std::vector<int>& a_star, int p, size_t num_threads) {
+    int n = a_star.size();
+    if (num_threads == 1) {
+        return intt(a_star, p);
+    }
+
+    std::vector<std::thread> threads;
+    threads.reserve(num_threads - 1);
+
+    std::vector<int> a(n);
+    std::mutex mtx;
+
+    int inv_psi = find_2n_roots(p, n)[1];
+    int inv_n = mod_exp(n, p - 2, p);
+
+    for (size_t i = 1; i < num_threads; ++i) {
+        threads.emplace_back(compute_intt_segment, std::cref(a_star), std::ref(a), i, num_threads, n, p, inv_psi, inv_n, std::ref(mtx));
+    }
+    compute_intt_segment(a_star, a, 0, num_threads, n, p, inv_psi, inv_n, mtx);
+
+    for (auto& th : threads) {
+        th.join();
+    }
+
+    return a;
+}
+
+
+/*------------------------------------Parallel INTT Gentleman Sande ------------------------------------*/
+
