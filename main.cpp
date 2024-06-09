@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <chrono>
 #include <mutex>
-#include "test.cpp"
+#include "plot.cpp"
 
 
 #define M_PI 3.14159265358979323846
@@ -19,9 +19,9 @@ typedef std::complex<double> complex;
 int main() {
 
     bool test_mult = 0;
-    bool test_fft = 0;
+    bool test_fft = 1;
     std::string file_path;
-    std::vector<complex> weather_data;
+    std::vector<complex> data_vect;
     if(test_mult){
 
         std::vector<int> intVector = {1, 2, 3, 4};
@@ -84,22 +84,24 @@ int main() {
     else if(test_fft) {
 
         bool use_dummy_data = 0; // Test it on {1, 2, 3, 4}
-        bool use_synthetic_data = 0; // Test it on synthetic data (sine)
-        bool use_weather_data = 1; // Test it on weather data from file
+        bool use_synthetic_data = 1; // Test it on synthetic data (sine)
+        bool use_weather_data = 0; // Test it on weather data from file
         int num_threads = 10;
 
         if (use_dummy_data) {
-            weather_data = {1, 2, 3, 4};
+            data_vect = {1, 2, 3, 4};
         } else if (use_synthetic_data) {
-            weather_data = generate_synthetic_data(10E4);
+            data_vect = generate_synthetic_data(10E4);
         } else if (use_weather_data) {
             file_path = "../data/natural_gas_co2_emissions_for_electric_power_sector.csv";
             //file_path = "../data/Paris_data.csv";
-            weather_data = get_weather_data(file_path);
+            data_vect = get_weather_data(file_path);
         }
 
-        test_naive_dft(weather_data, num_threads);
-        test_radix2(weather_data, num_threads);
+//        test_naive_dft(data_vect, num_threads);
+//        test_radix2(data_vect, num_threads);
+        int num_executions = 5;
+        benchmark(data_vect, num_executions);
     }
     else{
 
@@ -111,10 +113,13 @@ int main() {
 
 // Test find_generator
 
-        size_t num_threads = 5;
-        int n = 16;
-        int p = 7681;
-        test_find_generator(n, p, num_threads);
+//        size_t num_threads = 5;
+//        int n = 16;
+//        int p = 7681;
+//        test_find_generator(n, p, num_threads);
+
+
+
     }
 
 

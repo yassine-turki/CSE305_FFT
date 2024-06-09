@@ -21,7 +21,8 @@ typedef std::complex<double> complex;
 
 
 
-void test_naive_dft(std::vector<complex> data, int num_threads) {
+std::vector<double> test_naive_dft(std::vector<complex> data, int num_threads) {
+    std::vector<double> times;
     std::vector<complex> result_seq, result_parallel;
     auto start_seq = std::chrono::system_clock::now();
 
@@ -31,6 +32,7 @@ void test_naive_dft(std::vector<complex> data, int num_threads) {
     auto end_seq = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds_seq = end_seq - start_seq;
     std::cout << "Time taken for Naive serial DFT: " << elapsed_seconds_seq.count() << "s\n";
+    times.push_back(elapsed_seconds_seq.count());
 
     auto start_parallel = std::chrono::system_clock::now();
 
@@ -40,6 +42,7 @@ void test_naive_dft(std::vector<complex> data, int num_threads) {
     auto end_parallel = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds_parallel = end_parallel - start_parallel;
     std::cout << "Time taken for Naive parallel DFT with " << num_threads << " threads: " << elapsed_seconds_parallel.count() << "s\n";
+    times.push_back(elapsed_seconds_parallel.count());
 
     // Comparison of Sequential with data
     bool error = false;
@@ -67,9 +70,12 @@ void test_naive_dft(std::vector<complex> data, int num_threads) {
 //    if(!error) {
 //        std::cout << "No errors found!" << std::endl;
 //    }
+
+        return times;
 }
 
-void test_radix2(std::vector<complex> data, int num_threads) {
+std::vector<double> test_radix2(std::vector<complex> data, int num_threads) {
+    std::vector<double> times;
     std::vector<complex> result_seq;
     std::vector<complex> result_parallel = data;
     auto start_seq = std::chrono::system_clock::now();
@@ -80,6 +86,7 @@ void test_radix2(std::vector<complex> data, int num_threads) {
     auto end_seq = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds_seq = end_seq - start_seq;
     std::cout << "Time taken for serial Radix2: " << elapsed_seconds_seq.count() << "s\n";
+    times.push_back(elapsed_seconds_seq.count());
 
     auto start_parallel = std::chrono::system_clock::now();
 
@@ -89,6 +96,7 @@ void test_radix2(std::vector<complex> data, int num_threads) {
     auto end_parallel = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds_parallel = end_parallel - start_parallel;
     std::cout << "Time taken for parallel Radix2 with " << num_threads << " threads: " << elapsed_seconds_parallel.count() << "s\n";
+    times.push_back(elapsed_seconds_parallel.count());
 
     // Comparison of Sequential with data
     bool error = false;
@@ -116,7 +124,10 @@ void test_radix2(std::vector<complex> data, int num_threads) {
 //    if(!error) {
 //        std::cout << "No errors found!" << std::endl;
 //    }
+
+        return times;
 }
+
 
 
 void test_is_prime(const std::vector<int>& test_values, size_t num_threads) {
