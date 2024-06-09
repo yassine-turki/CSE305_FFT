@@ -56,10 +56,29 @@ std::vector<complex> get_weather_data(std::string file_path) {
 
 std::vector<complex> generate_synthetic_data(int num_points) {
     std::vector<complex> data(num_points);
-    double frequency = 1.0;
-    double amplitude = 1.5;
+    double frequency = 5;
+    double amplitude = 10;
     for (int i = 0; i < num_points; ++i) {
         data[i] = amplitude * std::sin(2 * M_PI * frequency * i / num_points);
     }
     return data;
+}
+
+
+
+
+void write_data(std::vector<complex> &data, std::string file_path) {
+std::ofstream file(file_path);
+
+
+    if (!file.is_open()) {
+        std::cerr << "Failed to open the file!" << std::endl;
+    }
+    // header
+    file << "Value\n";
+
+    for (int i = 0; i < data.size(); i++) {
+        file << data[i].real() << "\n";
+    }
+    file.close();
 }

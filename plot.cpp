@@ -100,7 +100,7 @@ int benchmark(std::vector<complex> data, int num_executions = 10){
     }
 
     // Write header
-    file << "Algorithm,Sequential";
+    file << "Algorithm";
     for (int num_thread : num_threads) {
         file << "," << num_thread;
     }

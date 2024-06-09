@@ -9,17 +9,20 @@
 #include <algorithm>
 #include <chrono>
 #include <mutex>
-#include "plot.cpp"
+#include "compress.cpp"
 
 
 #define M_PI 3.14159265358979323846
 
 typedef std::complex<double> complex;
 
+
+
 int main() {
 
     bool test_mult = 0;
-    bool test_fft = 1;
+    bool test_fft = 0;
+    bool test_compression = 1;
     std::string file_path;
     std::vector<complex> data_vect;
     if(test_mult){
@@ -102,6 +105,65 @@ int main() {
 //        test_radix2(data_vect, num_threads);
         int num_executions = 5;
         benchmark(data_vect, num_executions);
+    }
+    else if(test_compression){
+
+        // Test compression image
+
+
+//        std::string image_path =  "../philip.png";
+//        int w,h;
+//        std::vector<complex> *img_data = read_img(image_path, w, h);
+//        std::vector<complex> img_data_copy = *img_data;
+//        int num_threads = 10;
+//        parallel_fft_image(*img_data, w, h, num_threads);
+//       double threshold = get_threshold_value(*img_data, 0.8);
+//
+//        double threshold = get_threshold_value(*img_data, 0.4);
+//        compress(*img_data, threshold, num_threads);
+//        parallel_inverse_fft_image(*img_data, w, h, num_threads);
+//        write_img(*img_data, w, h, "../test.png");
+
+// Test compression weather_data
+
+      std::vector<complex> weather_data = get_weather_data("../data/weather_data_2024.csv");
+      int num_threads = 10;
+      FFT_Radix2_Parallel(weather_data, num_threads);
+      for(int i = 40; i>0; i-=39){
+            int percentage_keep = i;
+            double threshold = get_threshold_value(weather_data, percentage_keep / 100.);
+            compress(weather_data, threshold, num_threads);
+            Inverse_Radix2_Parallel(weather_data, num_threads);
+            std::string percentage_keep_str = std::to_string(percentage_keep);
+            std::string compressed_data_path = "../data/weather_data_2024_" + percentage_keep_str + ".csv";
+            write_data(weather_data, compressed_data_path);
+        }
+
+
+
+
+// Write data synthetic
+//
+//       std::vector<complex> synthetic_data = generate_synthetic_data(10E4);
+//       write_data(synthetic_data, "../data/synthetic_data10E4.csv");
+//       int num_threads = 10;
+//       FFT_Radix2_Parallel(synthetic_data, num_threads);
+//       int percentage_keep = 40;
+//       double threshold = get_threshold_value(synthetic_data, percentage_keep/100.);
+//       compress(synthetic_data, threshold, num_threads);
+//       Inverse_Radix2_Parallel(synthetic_data, num_threads);
+//       std::string percentage_keep_str = std::to_string(percentage_keep);
+//       std::string compressed_data_path = "../data/synthetic_data10E4_" + percentage_keep_str + ".csv";
+//       write_data(synthetic_data, compressed_data_path);
+//        percentage_keep = 1;
+//        threshold = get_threshold_value(synthetic_data, percentage_keep/100.);
+//        compress(synthetic_data, threshold, num_threads);
+//        Inverse_Radix2_Parallel(synthetic_data, num_threads);
+//        percentage_keep_str = std::to_string(percentage_keep);
+//        compressed_data_path = "../data/synthetic_data10E4_" + percentage_keep_str + ".csv";
+//        write_data(synthetic_data, compressed_data_path);
+
+
     }
     else{
 
