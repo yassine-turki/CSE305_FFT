@@ -88,7 +88,7 @@ std::vector<complex> multiply_polynomials_FFT(std::vector<complex> P, std::vecto
 bool is_prime(int p){
     if (p == 0 || p == 1){return false;}
     if (p == 2){return true;}
-    int root = std::ceil(std::sqrt(p));
+    int root = static_cast<int>(std::sqrt(p));
     for(int i = 2; i <= root; i++){
         if (p % i == 0){
             return false;
@@ -153,7 +153,7 @@ std::vector<int> prime_decomposition(int n){
         prime_factors.push_back(n);
         return prime_factors;
     }
-    for (int i = 2; i <= n; i++){
+    for (int i = 2; i <= n / 2 + 1; i++){
         if (is_prime(i) && (n % i == 0)){
             prime_factors.push_back(i);
         }
@@ -161,17 +161,54 @@ std::vector<int> prime_decomposition(int n){
     return prime_factors;
 }
 
-int mod_exp(int base, int exp, int mod) {
-    int result = 1;
-    base = base % mod;
-    while (exp > 0) {
-        if (exp % 2 == 1) {
-            result = (result * base) % mod;
+void find_primes_thread(int n, std::vector<int>& prime_factors, int start_block, int end_block, std::mutex& mtx){
+    std::vector<int> local_primes;  
+    for (int i = start_block; i < end_block; ++i) {
+        if (is_prime(i) && (n % i == 0)) {
+            local_primes.push_back(i);
         }
-        exp = exp >> 1; 
-        base = (base * base) % mod; 
+    }
+    std::lock_guard<std::mutex> lock(mtx);  
+    prime_factors.insert(prime_factors.end(), local_primes.begin(), local_primes.end());
+}
+
+std::vector<int> prime_decomposition_parallel(int n, int num_threads){
+    std::vector<int> prime_factors;
+    std::vector<std::thread> threads;
+    threads.reserve(num_threads - 1);
+    std::mutex mtx;
+
+    if (n == 0 or n == 1){return prime_factors;}
+    if (is_prime_parallel(n, num_threads)){
+        prime_factors.push_back(n);
+        return prime_factors;
     }
 
+    int chunk_size = (n / 2 - 1) / num_threads;
+
+    int start_block = 2;
+    for (size_t i = 0; i < num_threads - 1; ++i) {
+        int end_block = start_block + chunk_size - 1;
+        threads[i] = std::thread(find_primes_thread, n, std::ref(prime_factors), start_block, end_block, std::ref(mtx));
+        start_block = end_block;
+    }
+
+    find_primes_thread(n, prime_factors, start_block, n / 2 + 1, mtx);
+
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    return prime_factors;
+}
+
+int mod_exp(int base, int exp, int mod){
+    int result = 1;
+    base = base % mod;
+    for (int i = 0; i < exp; i++){
+        result = (result * base) % mod;
+    }
+    if (result < 0){result += mod;}
     return result;
 }
 
@@ -200,52 +237,50 @@ int find_generator(int p, int n){
 
 /*------------------------------------Find generator parallel------------------------------------*/
 
-void find_generator_thread(int p, int n, std::vector<int> prime_factors, int start_block, int end_block, std::atomic<int>& generator){
-    for (int i = start_block; i <= end_block; i++){
+
+void find_generator_thread(int p, int n, const std::vector<int>& prime_factors, int start_block, int end_block, std::atomic<int>& generator) {
+    for (int i = start_block; i <= end_block; i++) {
         int ct = 0;
-        for (int prime: prime_factors){
+        for (int prime : prime_factors) {
             int y = mod_exp(i, (p - 1) / prime, p);
-            if (y == 1){
+            if (y == 1) {
                 break;
             }
             ct += 1;
-            if (ct == prime_factors.size()){
-                generator = i;
+            if (ct == prime_factors.size()) {
+                if (generator.load() == 0) {
+                    generator = i;
+                }
                 return;
             }
         }
     }
 }
 
-int find_generator_parallel(int p, int n, size_t num_threads){
+int find_generator_parallel(int p, int n, size_t num_threads) {
     int k = (p - 1) / n;
     std::vector<int> prime_factors = prime_decomposition(k);
     auto it = std::find(prime_factors.begin(), prime_factors.end(), 2);
-    if (it == prime_factors.end()){prime_factors.push_back(2);}
+    if (it == prime_factors.end()) {
+        prime_factors.push_back(2);
+    }
     std::atomic<int> generator(0);
     std::vector<std::thread> threads(num_threads - 1);
     int chunk_size = p / num_threads;
     int start_block = 1;
-    for(int i = 0; i < num_threads - 1; ++i) {
+    for (size_t i = 0; i < num_threads - 1; ++i) {
         int end_block = start_block + chunk_size - 1;
-        threads[i] = std::thread(&find_generator_thread, p, n, prime_factors, start_block, end_block,
-                                 std::ref(generator));
+        threads[i] = std::thread(find_generator_thread, p, n, std::cref(prime_factors), start_block, end_block, std::ref(generator));
         start_block = end_block + 1;
     }
 
     find_generator_thread(p, n, prime_factors, start_block, p, generator);
-    for (auto& t: threads){
+
+    for (auto& t : threads) {
         t.join();
     }
 
-    return generator;
-}
-
-
-int find_omega(int p, int n){
-    int g = find_generator(p, n);
-    int k = (p - 1) / n;
-    return mod_exp(g, k, p);
+    return generator.load();
 }
 
 std::vector<int> find_2n_roots(int p, int n){
