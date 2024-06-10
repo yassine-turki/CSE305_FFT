@@ -167,8 +167,11 @@ void find_2n_thread(int p, int n, int start_block, int end_block, std::atomic<in
             int pow_2 = mod_exp(pow, 2, p);
             if (pow_2 == 1){
                 int expected = 0;
-                generator.compare_exchange_strong(expected, i);
-                return;
+                while(true){
+                    if (generator.compare_exchange_weak(expected, i)){
+                        return;
+                    }
+                }
             }
         }
     }
