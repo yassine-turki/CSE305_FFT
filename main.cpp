@@ -53,14 +53,39 @@ int main() {
         roots[32768] = std::make_pair(3, 21846);
         roots[65536] = std::make_pair(393174, 633878);
         roots[131072] = std::make_pair(357046, 742597);
-        // std::vector<int> inverse_ntt = {2489, 7489, 6478, 6607};
-        std::pair<std::vector<int>, std::vector<int>> data = generate_synthetic_data_ntt(8192);
-        std::cout<<"1"<<std::endl;
-        std::vector<double> times = test_convolutions(data, roots, num_threads);
+        std::vector<int> inverse_ntt = {2489, 7489, 6478, 6607};
+        std::pair<std::vector<int>, std::vector<int>> data = generate_synthetic_data_ntt(128);
+        int p = prime_ntt_find(1024);
+       
+        std::vector<int> conv_naive = convolution_ntt(data.first, data.second, p, roots);
+        for (const auto& term: conv_naive){
+            std::cout<<term<<" ";
+        }
+        std::cout<<"Naive"<<std::endl;
+
+        std::vector<int> conv_fast = convolution_fast(data.first, data.second, p, roots);
+        for (const auto& term: conv_fast){
+            std::cout<<term<<" ";
+        }
+        std::cout<<"Fast"<<std::endl;
+
+        std::vector<int> conv_naive_parallel = convolution_ntt_parallel(data.first, data.second, p, roots, num_threads);
+        for (const auto& term: conv_naive_parallel){
+            std::cout<<term<<" ";
+        }
+        std::cout<<"Naive parallel"<<std::endl;
+
+        std::vector<int> conv_fast_parallel = convolution_fast_parallel(data.first, data.second, p, roots, num_threads);
+        for (const auto& term: conv_fast_parallel){
+            std::cout<<term<<" ";
+        }
+        std::cout<<"Fast parallel"<<std::endl;
+
+        // std::vector<double> times = test_convolutions(data, roots, num_threads);
         // std::cout<<"Time taken for naive convolution is "<<times[0]<<std::endl;
         // std::cout<<"Time taken for fast convolution is "<<times[0]<<std::endl;
         // std::cout<<"Time taken for naive parallel convolution with "<<num_threads<<" threads is "<<times[1]<<std::endl;
-        std::cout<<"Time taken for fast parallel convolution with "<<num_threads<<" threads is "<<times[0]<<std::endl;
+        // std::cout<<"Time taken for fast parallel convolution with "<<num_threads<<" threads is "<<times[0]<<std::endl;
 
     }
     else if(test_fft) {

@@ -167,10 +167,8 @@ void find_2n_thread(int p, int n, int start_block, int end_block, std::atomic<in
             int pow_2 = mod_exp(pow, 2, p);
             if (pow_2 == 1){
                 int expected = 0;
-                while(true){
-                    if (generator.compare_exchange_weak(expected, i)){
-                        return;
-                    }
+                if (generator.compare_exchange_weak(expected, i)){
+                    return;
                 }
             }
         }
@@ -243,7 +241,41 @@ std::vector<int> convolution_ntt(std::vector<int> a, std::vector<int> b, int p, 
 /*------------------------------------Fast convolution using NTT------------------------------------*/
 
 
-std::vector<int> fast_ntt(std::vector<int> a, int p, std::unordered_map<int, std::pair<int, int>> roots) {
+// std::vector<int> fast_ntt(std::vector<int> a, int p, std::unordered_map<int, std::pair<int, int>> roots) {
+//     int n = a.size();
+//     if(!is_power_of_two(n)){
+//         std::cout << "The input size " << n << " is not a power of 2! Resizing input" << std::endl;
+//         a.resize(next_power_of_two(a.size()));
+//         n = a.size();
+//     }
+
+//     if (n == 1) {
+//         return a;
+//     }
+
+//     int psi = roots[n].first;
+//     std::vector<int> u(n / 2), v(n / 2);
+//     for (int i = 0; i < n / 2; i++) {
+//         u[i] = a[2 * i];
+//         v[i] = a[2 * i + 1];
+//     }
+
+//     std::vector<int> u_star = fast_ntt(u, p, roots);
+//     std::vector<int> v_star = fast_ntt(v, p, roots);
+//     std::vector<int> a_star(n);
+
+//     int t = psi;
+//     for (int i = 0; i < n / 2; i++) {
+//         a_star[i] = (u_star[i] + t * v_star[i]) % p;
+//         if (a_star[i] < 0) a_star[i] += p;
+//         a_star[i + n / 2] = (u_star[i] - t * v_star[i]) % p;
+//         if (a_star[i + n / 2] < 0) a_star[i + n / 2] += p;
+//         t = (t * mod_exp(psi, 2, p)) % p;
+//     }
+//     return a_star;
+// }
+
+std::vector<int> fast_ntt(std::vector<int> a, int p) {
     int n = a.size();
     if(!is_power_of_two(n)){
         std::cout << "The input size " << n << " is not a power of 2! Resizing input" << std::endl;
@@ -255,15 +287,15 @@ std::vector<int> fast_ntt(std::vector<int> a, int p, std::unordered_map<int, std
         return a;
     }
 
-    int psi = roots[n].first;
+    int psi = find_2n_roots(p, n).first;
     std::vector<int> u(n / 2), v(n / 2);
     for (int i = 0; i < n / 2; i++) {
         u[i] = a[2 * i];
         v[i] = a[2 * i + 1];
     }
 
-    std::vector<int> u_star = fast_ntt(u, p, roots);
-    std::vector<int> v_star = fast_ntt(v, p, roots);
+    std::vector<int> u_star = fast_ntt(u, p);
+    std::vector<int> v_star = fast_ntt(v, p);
     std::vector<int> a_star(n);
 
     int t = psi;
@@ -276,6 +308,7 @@ std::vector<int> fast_ntt(std::vector<int> a, int p, std::unordered_map<int, std
     }
     return a_star;
 }
+
 
 unsigned int reverse_bits(unsigned int x, int num_bits) {
     unsigned int result = 0;
@@ -368,8 +401,8 @@ std::vector<int> convolution_fast(std::vector<int> a, std::vector<int> b, int p,
     int n = std::max(a.size(), b.size());
     a.resize(n);
     b.resize(n);
-    std::vector<int> a_star = fast_ntt(a, p, roots);
-    std::vector<int> b_star = fast_ntt(b, p, roots);
+    std::vector<int> a_star = fast_ntt(a, p);
+    std::vector<int> b_star = fast_ntt(b, p);
     std::vector<int> c_star(n);
     for (int i = 0; i < n; i++){
         c_star[i] = (a_star[i] * b_star[i]) % p;
@@ -511,7 +544,7 @@ void combine_results_NTT(std::vector<int>& a, const std::vector<int>& u, const s
     }
 }
 
-void fast_ntt_parallel(std::vector<int>& a, int p, std::unordered_map<int, std::pair<int, int>> roots, size_t num_threads) {
+void fast_ntt_parallel(std::vector<int>& a, int p, size_t num_threads) {
     size_t n = a.size();
     if (!is_power_of_two(n)) {
         std::cout << "The input size " << n << " is not a power of 2! Resizing input" << std::endl;
@@ -520,11 +553,11 @@ void fast_ntt_parallel(std::vector<int>& a, int p, std::unordered_map<int, std::
     }
 
     if (num_threads == 1 || n == 1) {
-        a = fast_ntt(a, p, roots);
+        a = fast_ntt(a, p);
         return;
     }
 
-    int psi = roots[n].first;
+    int psi = find_2n_roots(p, n).first;
     std::vector<int> u(n / 2), v(n / 2);
 
     size_t split_threads = std::min(num_threads, n / 2);
@@ -540,8 +573,8 @@ void fast_ntt_parallel(std::vector<int>& a, int p, std::unordered_map<int, std::
     for (auto& th : split_threads_list) {
         th.join();
     }
-    std::thread t1(fast_ntt_parallel, std::ref(u), p, roots, num_threads / 2);
-    std::thread t2(fast_ntt_parallel, std::ref(v), p, roots, num_threads / 2);
+    std::thread t1(fast_ntt_parallel, std::ref(u), p, num_threads / 2);
+    std::thread t2(fast_ntt_parallel, std::ref(v), p, num_threads / 2);
     t1.join();
     t2.join();
 
@@ -707,8 +740,8 @@ std::vector<int> convolution_fast_parallel(std::vector<int> a, std::vector<int> 
     int n = std::max(a.size(), b.size());
     a.resize(n);
     b.resize(n);
-    fast_ntt_parallel(a, p, roots, num_threads / 2);
-    fast_ntt_parallel(b, p, roots, num_threads / 2);
+    fast_ntt_parallel(a, p, num_threads / 2);
+    fast_ntt_parallel(b, p, num_threads / 2);
     std::vector<int> c(n);
 
     std::vector<std::thread> threads;
