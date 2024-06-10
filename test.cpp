@@ -149,24 +149,6 @@ void test_is_prime(const std::vector<int>& test_values, size_t num_threads) {
     }
 }
 
-
-void test_find_generator(int n, int p, size_t num_threads) {
-    auto start = std::chrono::high_resolution_clock::now();
-    int result_single = find_generator(p, n);
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration_single = end - start;
-
-    start = std::chrono::high_resolution_clock::now();
-    int result_parallel = find_generator_parallel(p, n, num_threads);
-    end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration_parallel = end - start;
-
-    std::cout << "Testing n: " << n << ", p: " << p << "\n";
-    std::cout << "Single-threaded result: " << result_single << ", Time: " << duration_single.count() << " seconds\n";
-    std::cout << "Multi-threaded result with " << num_threads << " threads: "<<result_parallel << ", Time: " << duration_parallel.count() << " seconds\n";
-    std::cout << "--------------------------------------------------\n";
-}
-
 void test_prime_decomposition(int n) {
     std::vector<int> prime_factors = prime_decomposition(n);
     std::cout << "Testing n: " << n << "\n";
@@ -180,4 +162,45 @@ void test_prime_decomposition(int n) {
         std::cout << c <<" ";
     }
     std::cout<<"Parallel"<<std::endl;
+}
+
+std::vector<double> test_convolutions(std::pair<std::vector<int>, std::vector<int>> &data, std::unordered_map<int, std::pair<int, int>> roots, int num_threads){
+    std::vector<double> times;
+    std::vector<int> poly_1 = data.first;
+    std::vector<int> poly_2 = data.second;
+    int n = poly_1.size();
+    int p = prime_ntt_find(n);
+
+    // Naive ntt
+    // auto start_naive = std::chrono::high_resolution_clock::now();
+    // std::cout<<"Enter 1"<<std::endl;
+    // std::vector<int> conv_naive = convolution_ntt(poly_1, poly_2, p, roots);
+    // auto end_naive = std::chrono::high_resolution_clock::now();
+    // std::chrono::duration<double> duration_naive = end_naive - start_naive;
+    // times.push_back(duration_naive.count());
+
+    // Fast ntt
+    // auto start_fast = std::chrono::high_resolution_clock::now();
+    // std::cout<<"Enter 2"<<std::endl;
+    // std::vector<int> conv_fast = convolution_fast(poly_1, poly_2, p, roots);
+    // auto end_fast = std::chrono::high_resolution_clock::now();
+    // std::chrono::duration<double> duration_fast = end_fast - start_fast;
+    // times.push_back(duration_fast.count());
+
+    // Naive ntt parallel
+    // auto start_naive_parallel = std::chrono::high_resolution_clock::now();
+    // std::cout<<"Enter 3"<<std::endl;
+    // std::vector<int> conv_naive_parallel = convolution_ntt_parallel(poly_1, poly_2, p, roots, num_threads);
+    // auto end_naive_parallel = std::chrono::high_resolution_clock::now();
+    // std::chrono::duration<double> duration_naive_parallel = end_naive_parallel - start_naive_parallel;
+    // times.push_back(duration_naive_parallel.count());
+
+    // Fast ntt parallel
+    auto start_fast_parallel = std::chrono::high_resolution_clock::now();
+    std::cout<<"Enter 4"<<std::endl;
+    std::vector<int> conv_fast_parallel = convolution_fast_parallel(poly_1, poly_2, p, roots, num_threads);
+    auto end_fast_parallel = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration_fast_parallel = end_fast_parallel - start_fast_parallel;
+    times.push_back(duration_fast_parallel.count());   
+    return times;    
 }

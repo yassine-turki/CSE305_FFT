@@ -12,6 +12,7 @@
 #include <set>
 #include <random>
 #include <atomic>
+#include <map>
 #include "poly_ops.cpp"
 
 ////////////////////////////////////////////////////////////////////
@@ -143,113 +144,64 @@ int mod_exp(int base, int exp, int mod){
 }
 
 
-/*------------------------------------Find generator------------------------------------*/
-int find_generator(int p, int n){
-    int k = (p - 1) / n;
-    std::vector<int> prime_factors = prime_decomposition(k);
-    auto it = std::find(prime_factors.begin(), prime_factors.end(), 2);
-    if (it == prime_factors.end()){prime_factors.push_back(2);}
-    for (int i = 1; i < p; i++){
-        int ct = 0;
-        for (int prime: prime_factors){
-            int y = mod_exp(i, (p - 1) / prime, p);
-            if (y == 1){
-                break;
-            }
-            ct += 1;
-            if (ct == prime_factors.size()){
-                return i;
+/*------------------------------------Find a 2nth root and its inverse------------------------------------*/
+
+std::pair<int, int> find_2n_roots(int p, int n){
+    for (int i = 2; i < p; i++){
+        int pow = mod_exp(i, n, p);
+        if (pow != 1){
+            int pow_2 = mod_exp(pow, 2, p);
+            if (pow_2 == 1){
+                int inv = mod_exp(i, 2 * n - 1, p);
+                return {i, inv};
             }
         }
     }
-    return 0;
+    return {0,0};
 }
 
-/*------------------------------------Find generator parallel------------------------------------*/
-
-
-void find_generator_thread(int p, int n, const std::vector<int>& prime_factors, int start_block, int end_block, std::atomic<int>& generator) {
+void find_2n_thread(int p, int n, int start_block, int end_block, std::atomic<int>& generator){
     for (int i = start_block; i <= end_block; i++) {
-        int ct = 0;
-        for (int prime : prime_factors) {
-            int y = mod_exp(i, (p - 1) / prime, p);
-            if (y == 1) {
-                break;
-            }
-            ct += 1;
-            if (ct == prime_factors.size()) {
-                if (generator.load() == 0) {
-                    generator = i;
-                }
+        int pow = mod_exp(i, n, p);
+        if (pow != 1){
+            int pow_2 = mod_exp(pow, 2, p);
+            if (pow_2 == 1){
+                int expected = 0;
+                generator.compare_exchange_strong(expected, i);
                 return;
             }
         }
     }
 }
 
-int find_generator_parallel(int p, int n, size_t num_threads) {
-    int k = (p - 1) / n;
-    std::vector<int> prime_factors = prime_decomposition(k);
-    auto it = std::find(prime_factors.begin(), prime_factors.end(), 2);
-    if (it == prime_factors.end()) {
-        prime_factors.push_back(2);
-    }
+std::pair<int, int> find_2n_roots_parallel(int p, int n, size_t num_threads) {
     std::atomic<int> generator(0);
     std::vector<std::thread> threads(num_threads - 1);
     int chunk_size = p / num_threads;
     int start_block = 1;
     for (size_t i = 0; i < num_threads - 1; ++i) {
         int end_block = start_block + chunk_size - 1;
-        threads[i] = std::thread(find_generator_thread, p, n, std::cref(prime_factors), start_block, end_block, std::ref(generator));
+        threads[i] = std::thread(find_2n_thread, p, n, start_block, end_block, std::ref(generator));
         start_block = end_block + 1;
     }
 
-    find_generator_thread(p, n, prime_factors, start_block, p, generator);
+    find_2n_thread(p, n, start_block, p, generator);
 
     for (auto& t : threads) {
         t.join();
     }
 
-    return generator.load();
+    int root = generator.load();
+    int inv_root = mod_exp(root, 2 * n - 1, p); 
+    return {root, inv_root};
 }
-
-std::vector<int> find_2n_roots(int p, int n){
-    int g = find_generator(p, n);
-    int k = (p - 1) / n;
-    if (k % 2 != 0){
-        throw std::runtime_error("There is no 2n-th root of unity!");
-    }
-    if (g == 0){
-        throw std::runtime_error("There is no generator!");
-    }
-    int root_1 = mod_exp(g, k / 2, p);
-    int root_2 = mod_exp(root_1, 2 * n - 1, p);
-    std::vector<int> roots = {root_1, root_2};
-    return roots;
-}
-
-std::vector<int> find_2n_roots_parallel(int p, int n, int num_threads){
-    int g = find_generator_parallel(p, n, num_threads);
-    int k = (p - 1) / n;
-    if (k % 2 != 0){
-        throw std::runtime_error("There is no 2n-th root of unity!");
-    }
-    if (g == 0){
-        throw std::runtime_error("There is no generator!");
-    }
-    int root_1 = mod_exp(g, k / 2, p);
-    int root_2 = mod_exp(root_1, 2 * n - 1, p);
-    std::vector<int> roots = {root_1, root_2};
-    return roots;
-}
-
 /*------------------------------------Naive Convolution using NTT------------------------------------*/
 
 
-std::vector<int> ntt(std::vector<int> a, int p){
+std::vector<int> ntt(std::vector<int> a, int p, std::unordered_map<int, std::pair<int, int>> roots){
     int n = a.size();
     std::vector<int> a_star(n);
-    int psi = find_2n_roots(p, n)[0];
+    int psi = roots[n].first;
     for (int i = 0; i < n; i++){
         for (int j = 0; j < n; j++){
             a_star[i] = (a_star[i] + a[j] * mod_exp(psi, 2 * i * j + j, p)) % p;
@@ -258,10 +210,10 @@ std::vector<int> ntt(std::vector<int> a, int p){
     return a_star;
 }
 
-std::vector<int> intt(std::vector<int> a_star, int p){
+std::vector<int> intt(std::vector<int> a_star, int p, std::unordered_map<int, std::pair<int, int>> roots){
     int n = a_star.size();
     std::vector<int> a(n);
-    int inv_psi = find_2n_roots(p, n)[1];
+    int inv_psi = roots[n].second;
     int inv_n = mod_exp(n, p - 2, p);
     for (int i = 0; i < n; i++){
         for(int j = 0; j < n; j++){
@@ -272,24 +224,23 @@ std::vector<int> intt(std::vector<int> a_star, int p){
     return a;
 }
 
-std::vector<int> convolution_ntt(std::vector<int> a, std::vector<int> b){
+std::vector<int> convolution_ntt(std::vector<int> a, std::vector<int> b, int p, std::unordered_map<int, std::pair<int, int>> roots){
     int n = std::max(a.size(), b.size());
     a.resize(n);
     b.resize(n);
-    int p = prime_ntt_find(n);
-    std::vector<int> a_star = ntt(a, p);
-    std::vector<int> b_star = ntt(b, p);
+    std::vector<int> a_star = ntt(a, p, roots);
+    std::vector<int> b_star = ntt(b, p, roots);
     std::vector<int> c_star(n);
     for (int i = 0; i < n; i++){
         c_star[i] = (a_star[i] * b_star[i]) % p;
     }
-    return intt(c_star, p);
+    return intt(c_star, p, roots);
 }
 
 /*------------------------------------Fast convolution using NTT------------------------------------*/
 
 
-std::vector<int> fast_ntt(std::vector<int> a, int p) {
+std::vector<int> fast_ntt(std::vector<int> a, int p, std::unordered_map<int, std::pair<int, int>> roots) {
     int n = a.size();
     if(!is_power_of_two(n)){
         std::cout << "The input size " << n << " is not a power of 2! Resizing input" << std::endl;
@@ -301,15 +252,15 @@ std::vector<int> fast_ntt(std::vector<int> a, int p) {
         return a;
     }
 
-    int psi = find_2n_roots(p, n)[0];
+    int psi = roots[n].first;
     std::vector<int> u(n / 2), v(n / 2);
     for (int i = 0; i < n / 2; i++) {
         u[i] = a[2 * i];
         v[i] = a[2 * i + 1];
     }
 
-    std::vector<int> u_star = fast_ntt(u, p);
-    std::vector<int> v_star = fast_ntt(v, p);
+    std::vector<int> u_star = fast_ntt(u, p, roots);
+    std::vector<int> v_star = fast_ntt(v, p, roots);
     std::vector<int> a_star(n);
 
     int t = psi;
@@ -361,7 +312,7 @@ std::vector<int> compute_powers_of_psi(int psi, int n, int p) {
     return bit_reversed_powers;
 }
 
-std::vector<int> fast_intt(std::vector<int> a_star, int p) {
+std::vector<int> fast_intt(std::vector<int> a_star, int p, std::unordered_map<int, std::pair<int, int>> roots) {
     int n = a_star.size();
     if (n == 1) {
         return a_star;
@@ -375,12 +326,8 @@ std::vector<int> fast_intt(std::vector<int> a_star, int p) {
 
     a_star = reverse_bit_order_array(a_star);
 
-    std::vector<int> roots = find_2n_roots(p, n);
-    int psi = roots[0];
-    int inv_psi = roots[1];
-    if (((inv_psi * psi) % p) != 1){
-        throw std::runtime_error("The roots are not well computed");
-    }
+    int psi = roots[n].first;
+    int inv_psi = roots[n].second;
     int inv_n = mod_exp(n, p - 2, p);
     std::vector<int> powers_inv_psi = compute_powers_of_psi(inv_psi, n, p);
     
@@ -414,18 +361,17 @@ std::vector<int> fast_intt(std::vector<int> a_star, int p) {
 }
 
 
-std::vector<int> convolution_fast(std::vector<int> a, std::vector<int> b){
+std::vector<int> convolution_fast(std::vector<int> a, std::vector<int> b, int p, std::unordered_map<int, std::pair<int, int>> roots){
     int n = std::max(a.size(), b.size());
     a.resize(n);
     b.resize(n);
-    int p = prime_ntt_find(n);
-    std::vector<int> a_star = fast_ntt(a, p);
-    std::vector<int> b_star = fast_ntt(b, p);
+    std::vector<int> a_star = fast_ntt(a, p, roots);
+    std::vector<int> b_star = fast_ntt(b, p, roots);
     std::vector<int> c_star(n);
     for (int i = 0; i < n; i++){
         c_star[i] = (a_star[i] * b_star[i]) % p;
     }
-    return fast_intt(c_star, p);
+    return fast_intt(c_star, p, roots);
 }
 
 
@@ -443,10 +389,10 @@ void compute_ntt_segment(const std::vector<int>& a, std::vector<int>& a_star, in
     }
 }
 
-std::vector<int> ntt_parallel(const std::vector<int>& a, int p, size_t num_threads) {
+std::vector<int> ntt_parallel(const std::vector<int>& a, int p, std::unordered_map<int, std::pair<int, int>> roots, size_t num_threads) {
     int n = a.size();
     if (num_threads == 1) {
-        return ntt(a, p);
+        return ntt(a, p, roots);
     }
 
     std::vector<int> a_star(n);
@@ -454,7 +400,7 @@ std::vector<int> ntt_parallel(const std::vector<int>& a, int p, size_t num_threa
     threads.reserve(num_threads - 1);
     std::mutex mtx;
 
-    int psi = find_2n_roots_parallel(p, n, num_threads)[0];
+    int psi = roots[n].first;
 
     for (size_t i = 1; i < num_threads; ++i) {
         threads.emplace_back(compute_ntt_segment, std::cref(a), std::ref(a_star), p, psi, i, num_threads, n, std::ref(mtx));
@@ -482,10 +428,10 @@ void compute_intt_segment(const std::vector<int>& a_star, std::vector<int>& a, s
     }
 }
 
-std::vector<int> intt_parallel(std::vector<int>& a_star, int p, size_t num_threads) {
+std::vector<int> intt_parallel(std::vector<int>& a_star, int p, std::unordered_map<int, std::pair<int, int>> roots, size_t num_threads) {
     int n = a_star.size();
     if (num_threads == 1) {
-        return intt(a_star, p);
+        return intt(a_star, p, roots);
     }
 
     std::vector<std::thread> threads;
@@ -494,7 +440,7 @@ std::vector<int> intt_parallel(std::vector<int>& a_star, int p, size_t num_threa
     std::vector<int> a(n);
     std::mutex mtx;
 
-    int inv_psi = find_2n_roots_parallel(p, n, num_threads)[1];
+    int inv_psi = roots[n].second;
     int inv_n = mod_exp(n, p - 2, p);
 
     for (size_t i = 1; i < num_threads; ++i) {
@@ -517,13 +463,12 @@ void compute_convolution_segment(const std::vector<int>& a, const std::vector<in
     }
 }
 
-std::vector<int> convolution_parallel(std::vector<int> a, std::vector<int> b, int num_threads){
+std::vector<int> convolution_ntt_parallel(std::vector<int> a, std::vector<int> b, int p, std::unordered_map<int, std::pair<int, int>> roots, int num_threads){
     int n = std::max(a.size(), b.size());
     a.resize(n);
     b.resize(n);
-    int p = prime_ntt_find(n);
-    std::vector<int> a_star = ntt_parallel(a, p, num_threads / 2);
-    std::vector<int> b_star = ntt_parallel(b, p, num_threads / 2);
+    std::vector<int> a_star = ntt_parallel(a, p, roots, num_threads / 2);
+    std::vector<int> b_star = ntt_parallel(b, p, roots, num_threads / 2);
     std::vector<int> c_star(n);
 
     std::vector<std::thread> threads;
@@ -539,7 +484,7 @@ std::vector<int> convolution_parallel(std::vector<int> a, std::vector<int> b, in
         th.join();
     }
 
-    return intt_parallel(c_star, p, num_threads);
+    return intt_parallel(c_star, p, roots, num_threads);
 }
 
 /*------------------------------------Parallel NTT Cooley ------------------------------------*/
@@ -563,7 +508,7 @@ void combine_results_NTT(std::vector<int>& a, const std::vector<int>& u, const s
     }
 }
 
-void fast_ntt_parallel(std::vector<int>& a, int p, size_t num_threads) {
+void fast_ntt_parallel(std::vector<int>& a, int p, std::unordered_map<int, std::pair<int, int>> roots, size_t num_threads) {
     size_t n = a.size();
     if (!is_power_of_two(n)) {
         std::cout << "The input size " << n << " is not a power of 2! Resizing input" << std::endl;
@@ -572,11 +517,11 @@ void fast_ntt_parallel(std::vector<int>& a, int p, size_t num_threads) {
     }
 
     if (num_threads == 1 || n == 1) {
-        a = fast_ntt(a, p);
+        a = fast_ntt(a, p, roots);
         return;
     }
 
-    int psi = find_2n_roots_parallel(p, n, num_threads)[0];
+    int psi = roots[n].first;
     std::vector<int> u(n / 2), v(n / 2);
 
     size_t split_threads = std::min(num_threads, n / 2);
@@ -592,8 +537,8 @@ void fast_ntt_parallel(std::vector<int>& a, int p, size_t num_threads) {
     for (auto& th : split_threads_list) {
         th.join();
     }
-    std::thread t1(fast_ntt_parallel, std::ref(u), p, num_threads / 2);
-    std::thread t2(fast_ntt_parallel, std::ref(v), p, num_threads / 2);
+    std::thread t1(fast_ntt_parallel, std::ref(u), p, roots, num_threads / 2);
+    std::thread t2(fast_ntt_parallel, std::ref(v), p, roots, num_threads / 2);
     t1.join();
     t2.join();
 
@@ -684,7 +629,7 @@ void compute_segment_fast_intt(int start, int end, int t, int p, const std::vect
     }
 }
 
-std::vector<int> fast_intt_parallel(std::vector<int> a_star, int p, int num_threads) {
+std::vector<int> fast_intt_parallel(std::vector<int> a_star, int p, std::unordered_map<int, std::pair<int, int>> roots, int num_threads) {
     int n = a_star.size();
     if (n == 1) {
         return a_star;
@@ -698,12 +643,8 @@ std::vector<int> fast_intt_parallel(std::vector<int> a_star, int p, int num_thre
 
     a_star = reverse_bit_order_array_parallel(a_star, num_threads);
 
-    std::vector<int> roots = find_2n_roots_parallel(p, n, num_threads);
-    int psi = roots[0];
-    int inv_psi = roots[1];
-    if (((inv_psi * psi) % p) != 1){
-        throw std::runtime_error("The roots are not well computed");
-    }
+    int psi = roots[n].first;
+    int inv_psi = roots[n].second;
     int inv_n = mod_exp(n, p - 2, p);
     std::vector<int> powers_inv_psi = compute_powers_of_psi_parallel(inv_psi, n, p, num_threads);
     
@@ -759,13 +700,12 @@ std::vector<int> fast_intt_parallel(std::vector<int> a_star, int p, int num_thre
 
 /*------------------------------------Parallel fast convolution ------------------------------------*/
 
-std::vector<int> convolution_fast_parallel(std::vector<int> a, std::vector<int> b, int num_threads){
+std::vector<int> convolution_fast_parallel(std::vector<int> a, std::vector<int> b, int p, std::unordered_map<int, std::pair<int, int>> roots, int num_threads){
     int n = std::max(a.size(), b.size());
     a.resize(n);
     b.resize(n);
-    int p = prime_ntt_find(n);
-    fast_ntt_parallel(a, p, num_threads / 2);
-    fast_ntt_parallel(b, p, num_threads / 2);
+    fast_ntt_parallel(a, p, roots, num_threads / 2);
+    fast_ntt_parallel(b, p, roots, num_threads / 2);
     std::vector<int> c(n);
 
     std::vector<std::thread> threads;
@@ -780,5 +720,5 @@ std::vector<int> convolution_fast_parallel(std::vector<int> a, std::vector<int> 
     for (auto& th : threads) {
         th.join();
     }
-    return fast_intt_parallel(c, p, num_threads);
+    return fast_intt_parallel(c, p, roots, num_threads);
 }

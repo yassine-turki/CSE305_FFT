@@ -16,72 +16,51 @@
 
 typedef std::complex<double> complex;
 
-
-
 int main() {
 
-    bool test_mult = 0;
+    bool test_mult = 1;
     bool test_fft = 0;
-    bool test_compression = 1;
+    bool test_compression = 0;
     std::string file_path;
     std::vector<complex> data_vect;
     if(test_mult){
-
+        // int p = 7681;
         std::vector<int> intVector = {1, 2, 3, 4};
         std::vector<int> intVector2 = {5, 6, 7, 8};
-        int p = 7681;
-        std::vector<int> inverse_ntt = {2489, 7489, 6478, 6607};
-
-        std::vector<complex> complexVector = {
-                {1.0, 2.0},
-                {3.0, 4.0},
-                {5.0, 6.0},
-                {7.0, 8.0}
-        };
-        std::vector<complex> complexVector2 = {
-                {1.0, 2.0},
-                {3.0, 4.0},
-                {5.0, 6.0},
-                {7.0, 8.0}
-        };
-
-        std::vector<complex> complexVector3 = {
-                {1.0, 0.0},
-                {2.0, 0.0},
-                {3.0, 0.0},
-                {4.0, 0.0}
-        };
-        std::vector<complex> complexVector4 = {
-                {1.0, 0.0},
-                {2.0, 0.0},
-                {3.0, 0.0},
-                {4.0, 0.0}
-        };
-
-        std::vector<int> int_arr = convolution_ntt(intVector, intVector2);
-        for (const auto& c : int_arr) {
-            std::cout << c <<" ";
-        }
-        std::cout<<"NTT"<<std::endl;
-        std::vector<int> int_arr_2 = convolution_ntt(intVector, intVector2);
-        for (const auto& c : int_arr_2) {
-            std::cout << c <<" ";
-        }
-        // std::cout<<"fast NTT"<<std::endl;
-        // int num_threads = 10;
-        // std::vector<int> int_sum_3 = ntt_parallel(intVector, p, num_threads);
-        // for (const auto& c : int_sum_3) {
-        //     std::cout << c <<" ";
+        int num_threads = 16;
+        std::unordered_map<int, std::pair<int, int>> roots;
+        // for (int i = 1; i < 20; i++){
+        //     int n = std::pow(2, i);
+        //     int p =prime_ntt_find(n);
+        //     std::pair<int, int> root = find_2n_roots_parallel(p, n, 10);
+        //     roots[n] = root;
+        //     std::cout<<i<<" "<<root.first<<" "<<root.second<<std::endl;
         // }
-        // std::cout<<"parallel NTT with "<< num_threads<<" threads"<<std::endl;
-
-        // std::vector<int> int_sum_4 = intVector;
-        // fast_ntt_parallel(int_sum_4, p, num_threads);
-        // for (const auto& c : int_sum_4) {
-        //     std::cout << c <<" ";
-        // }
-        // std::cout<<"parallel fast NTT with "<< num_threads<<" threads"<<std::endl;
-
+        roots[2] = std::make_pair(2, 3);
+        roots[4] = std::make_pair(2, 9);
+        roots[8] = std::make_pair(10, 12);
+        roots[16] = std::make_pair(19, 46);
+        roots[32] = std::make_pair(11, 158);
+        roots[64] = std::make_pair(9, 200);
+        roots[128] = std::make_pair(3, 86);
+        roots[256] = std::make_pair(793, 2838);
+        roots[512] = std::make_pair(1254, 49);
+        roots[1024] = std::make_pair(11053, 8481);
+        roots[2048] = std::make_pair(11054, 11483);
+        roots[4096] = std::make_pair(28673, 13657);
+        roots[8192] = std::make_pair(81, 8091);
+        roots[16384] = std::make_pair(39914, 27768);
+        roots[32768] = std::make_pair(3, 21846);
+        roots[65536] = std::make_pair(393174, 633878);
+        roots[131072] = std::make_pair(357046, 742597);
+        // std::vector<int> inverse_ntt = {2489, 7489, 6478, 6607};
+        std::pair<std::vector<int>, std::vector<int>> data = generate_synthetic_data_ntt(8192);
+        std::cout<<"1"<<std::endl;
+        std::vector<double> times = test_convolutions(data, roots, num_threads);
+        // std::cout<<"Time taken for naive convolution is "<<times[0]<<std::endl;
+        // std::cout<<"Time taken for fast convolution is "<<times[0]<<std::endl;
+        // std::cout<<"Time taken for naive parallel convolution with "<<num_threads<<" threads is "<<times[1]<<std::endl;
+        std::cout<<"Time taken for fast parallel convolution with "<<num_threads<<" threads is "<<times[0]<<std::endl;
 
     }
     else if(test_fft) {
