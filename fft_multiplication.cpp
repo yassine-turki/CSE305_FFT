@@ -12,74 +12,7 @@
 #include <set>
 #include <random>
 #include <atomic>
-#include "fft.cpp"
-
-
-typedef std::complex<double> complex;
-
-template<typename T>
-T evaluate_polynomial_trivial(std::vector<T> P, T x){
-    int N = P.size();
-    T X = 1;
-    T y;
-    for (int j = 0; j < N; j++){
-        y += P[j] * X;
-        X *= x;
-    }
-    return y;
-}
-
-template<typename T>
-std::vector<T> add_polynomials(std::vector<T> P, std::vector<T> Q){
-    int N = std::max(P.size(), Q.size());
-    P.resize(N);
-    Q.resize(N);
-    std::vector<T> R(N);
-    for (int j = 0; j < N; j++){
-        R[j] = P[j] + Q[j];
-    }
-    return R;
-}
-
-template<typename T>
-std::vector<T> multiply_polynomials_trivial(std::vector<T> P, std::vector<T> Q){
-    int N = P.size();
-    int M = Q.size();
-    std::vector<T> R(M + N, 0.);
-    for (int j = 0; j < N; j++){
-        for (int k = 0; k < M; k++){
-            R[j + k] += P[j] * Q[k];
-        }
-    }
-    return R;
-}
-
-template<typename T>
-T horner_evaluate(std::vector<T> P, T x){
-    int N = P.size();
-    T y = P[N - 1];
-    for (int j = N - 2; j >= 0; j--){
-        y = x * y + P[j];
-    }
-    return y;
-}
-
-
-
-std::vector<complex> multiply_polynomials_FFT(std::vector<complex> P, std::vector<complex> Q){
-    int N = P.size();
-    int M = Q.size();
-    int l = next_power_of_two(M + N);
-    P.resize(l);
-    Q.resize(l);
-    std::vector<complex> P_star = Radix2FFT(P);
-    std::vector<complex> Q_star = Radix2FFT(Q);
-    std::vector<complex> R_star(l);
-    for (int j = 0; j < l; j++){
-        R_star[j] = P_star[j] * Q_star[j];
-    }
-    return InverseRadix2FFT(R_star);
-}
+#include "poly_ops.cpp"
 
 ////////////////////////////////////////////////////////////////////
 // Polynomials with integer coefficents
@@ -131,19 +64,16 @@ bool is_prime_parallel(int p, size_t num_threads) {
 }
 
 
-std::vector<int> prime_fft_find(int n){ 
+int prime_ntt_find(int n){ 
     // we transformed the algorithm for making sure that the 2n-th root exists
-    int k = 2;
     int p = 2 * n + 1;
     while (true){
         if (is_prime(p)){
             break;
         }
-        k += 2;
         p += 2 * n;
     }
-    std::vector<int> prime_pair = {p, k};
-    return prime_pair;
+    return p;
 }
 
 std::vector<int> prime_decomposition(int n){
@@ -298,6 +228,24 @@ std::vector<int> find_2n_roots(int p, int n){
     return roots;
 }
 
+std::vector<int> find_2n_roots_parallel(int p, int n, int num_threads){
+    int g = find_generator_parallel(p, n, num_threads);
+    int k = (p - 1) / n;
+    if (k % 2 != 0){
+        throw std::runtime_error("There is no 2n-th root of unity!");
+    }
+    if (g == 0){
+        throw std::runtime_error("There is no generator!");
+    }
+    int root_1 = mod_exp(g, k / 2, p);
+    int root_2 = mod_exp(root_1, 2 * n - 1, p);
+    std::vector<int> roots = {root_1, root_2};
+    return roots;
+}
+
+/*------------------------------------Naive Convolution using NTT------------------------------------*/
+
+
 std::vector<int> ntt(std::vector<int> a, int p){
     int n = a.size();
     std::vector<int> a_star(n);
@@ -328,8 +276,7 @@ std::vector<int> convolution_ntt(std::vector<int> a, std::vector<int> b){
     int n = std::max(a.size(), b.size());
     a.resize(n);
     b.resize(n);
-    std::vector<int> pair = prime_fft_find(n);
-    int p = pair[0];
+    int p = prime_ntt_find(n);
     std::vector<int> a_star = ntt(a, p);
     std::vector<int> b_star = ntt(b, p);
     std::vector<int> c_star(n);
@@ -338,6 +285,9 @@ std::vector<int> convolution_ntt(std::vector<int> a, std::vector<int> b){
     }
     return intt(c_star, p);
 }
+
+/*------------------------------------Fast convolution using NTT------------------------------------*/
+
 
 std::vector<int> fast_ntt(std::vector<int> a, int p) {
     int n = a.size();
@@ -468,8 +418,7 @@ std::vector<int> convolution_fast(std::vector<int> a, std::vector<int> b){
     int n = std::max(a.size(), b.size());
     a.resize(n);
     b.resize(n);
-    std::vector<int> pair = prime_fft_find(n);
-    int p = pair[0];
+    int p = prime_ntt_find(n);
     std::vector<int> a_star = fast_ntt(a, p);
     std::vector<int> b_star = fast_ntt(b, p);
     std::vector<int> c_star(n);
@@ -481,7 +430,7 @@ std::vector<int> convolution_fast(std::vector<int> a, std::vector<int> b){
 
 
 
-/*------------------------------------Parallel NTT ------------------------------------*/
+/*------------------------------------Parallel Naive NTT ------------------------------------*/
 
 void compute_ntt_segment(const std::vector<int>& a, std::vector<int>& a_star, int p, int psi, size_t start_index, size_t num_threads, int n, std::mutex& mtx) {
     for (size_t i = start_index; i < n; i += num_threads) {
@@ -505,7 +454,7 @@ std::vector<int> ntt_parallel(const std::vector<int>& a, int p, size_t num_threa
     threads.reserve(num_threads - 1);
     std::mutex mtx;
 
-    int psi = find_2n_roots(p, n)[0];
+    int psi = find_2n_roots_parallel(p, n, num_threads)[0];
 
     for (size_t i = 1; i < num_threads; ++i) {
         threads.emplace_back(compute_ntt_segment, std::cref(a), std::ref(a_star), p, psi, i, num_threads, n, std::ref(mtx));
@@ -517,6 +466,80 @@ std::vector<int> ntt_parallel(const std::vector<int>& a, int p, size_t num_threa
     }
 
     return a_star;
+}
+
+/*------------------------------------Parallel Naive INTT ------------------------------------*/
+
+
+void compute_intt_segment(const std::vector<int>& a_star, std::vector<int>& a, size_t start_index, size_t num_threads, int n, int p, int inv_psi, int inv_n, std::mutex& mtx) {
+    for (size_t k = start_index; k < n ; k += num_threads) {
+        int sum = 0;
+        for (size_t j = 0; j < n; ++j) {
+            sum = (sum + a_star[j] * mod_exp(inv_psi, 2 * k * j + k, p)) % p;
+        }
+        std::lock_guard<std::mutex> lock(mtx);
+        a[k] = (sum * inv_n) % p;
+    }
+}
+
+std::vector<int> intt_parallel(std::vector<int>& a_star, int p, size_t num_threads) {
+    int n = a_star.size();
+    if (num_threads == 1) {
+        return intt(a_star, p);
+    }
+
+    std::vector<std::thread> threads;
+    threads.reserve(num_threads - 1);
+
+    std::vector<int> a(n);
+    std::mutex mtx;
+
+    int inv_psi = find_2n_roots_parallel(p, n, num_threads)[1];
+    int inv_n = mod_exp(n, p - 2, p);
+
+    for (size_t i = 1; i < num_threads; ++i) {
+        threads.emplace_back(compute_intt_segment, std::cref(a_star), std::ref(a), i, num_threads, n, p, inv_psi, inv_n, std::ref(mtx));
+    }
+    compute_intt_segment(a_star, a, 0, num_threads, n, p, inv_psi, inv_n, mtx);
+
+    for (auto& th : threads) {
+        th.join();
+    }
+
+    return a;
+}
+
+/*------------------------------------Parallel naive convolution ------------------------------------*/
+
+void compute_convolution_segment(const std::vector<int>& a, const std::vector<int>& b, std::vector<int>& c, size_t start_index, size_t num_threads, int n, int p, std::mutex& mtx){
+    for (size_t k = start_index; k < n ; k += num_threads) {
+        c[k] = (a[k] * b[k]) % p;
+    }
+}
+
+std::vector<int> convolution_parallel(std::vector<int> a, std::vector<int> b, int num_threads){
+    int n = std::max(a.size(), b.size());
+    a.resize(n);
+    b.resize(n);
+    int p = prime_ntt_find(n);
+    std::vector<int> a_star = ntt_parallel(a, p, num_threads / 2);
+    std::vector<int> b_star = ntt_parallel(b, p, num_threads / 2);
+    std::vector<int> c_star(n);
+
+    std::vector<std::thread> threads;
+    threads.reserve(num_threads - 1);
+    std::mutex mtx;
+
+    for (size_t i = 1; i < num_threads; ++i) {
+        threads.emplace_back(compute_convolution_segment, std::cref(a_star), std::cref(b_star), std::ref(c_star), i, num_threads, n, p, std::ref(mtx));
+    }
+    compute_convolution_segment(a_star, b_star, c_star, 0, num_threads, n, p, mtx);
+
+    for (auto& th : threads) {
+        th.join();
+    }
+
+    return intt_parallel(c_star, p, num_threads);
 }
 
 /*------------------------------------Parallel NTT Cooley ------------------------------------*/
@@ -553,7 +576,7 @@ void fast_ntt_parallel(std::vector<int>& a, int p, size_t num_threads) {
         return;
     }
 
-    int psi = find_2n_roots(p, n)[0];
+    int psi = find_2n_roots_parallel(p, n, num_threads)[0];
     std::vector<int> u(n / 2), v(n / 2);
 
     size_t split_threads = std::min(num_threads, n / 2);
@@ -584,47 +607,6 @@ void fast_ntt_parallel(std::vector<int>& a, int p, size_t num_threads) {
     for (auto& th : split_threads_list) {
         th.join();
     }
-}
-
-/*------------------------------------Parallel INTT ------------------------------------*/
-
-
-void compute_intt_segment(const std::vector<int>& a_star, std::vector<int>& a, size_t start_index, size_t num_threads, int n, int p, int inv_psi, int inv_n, std::mutex& mtx) {
-    for (size_t k = start_index; k < n ; k += num_threads) {
-        int sum = 0;
-        for (size_t j = 0; j < n; ++j) {
-            sum = (sum + a_star[j] * mod_exp(inv_psi, 2 * k * j + k, p)) % p;
-        }
-        std::lock_guard<std::mutex> lock(mtx);
-        a[k] = (sum * inv_n) % p;
-    }
-}
-
-std::vector<int> intt_parallel(std::vector<int>& a_star, int p, size_t num_threads) {
-    int n = a_star.size();
-    if (num_threads == 1) {
-        return intt(a_star, p);
-    }
-
-    std::vector<std::thread> threads;
-    threads.reserve(num_threads - 1);
-
-    std::vector<int> a(n);
-    std::mutex mtx;
-
-    int inv_psi = find_2n_roots(p, n)[1];
-    int inv_n = mod_exp(n, p - 2, p);
-
-    for (size_t i = 1; i < num_threads; ++i) {
-        threads.emplace_back(compute_intt_segment, std::cref(a_star), std::ref(a), i, num_threads, n, p, inv_psi, inv_n, std::ref(mtx));
-    }
-    compute_intt_segment(a_star, a, 0, num_threads, n, p, inv_psi, inv_n, mtx);
-
-    for (auto& th : threads) {
-        th.join();
-    }
-
-    return a;
 }
 
 
@@ -716,7 +698,7 @@ std::vector<int> fast_intt_parallel(std::vector<int> a_star, int p, int num_thre
 
     a_star = reverse_bit_order_array_parallel(a_star, num_threads);
 
-    std::vector<int> roots = find_2n_roots(p, n);
+    std::vector<int> roots = find_2n_roots_parallel(p, n, num_threads);
     int psi = roots[0];
     int inv_psi = roots[1];
     if (((inv_psi * psi) % p) != 1){
@@ -774,40 +756,6 @@ std::vector<int> fast_intt_parallel(std::vector<int> a_star, int p, int num_thre
     return a_star;
 }
 
-/*------------------------------------Parallel naive convolution ------------------------------------*/
-
-void compute_convolution_segment(const std::vector<int>& a, const std::vector<int>& b, std::vector<int>& c, size_t start_index, size_t num_threads, int n, int p, std::mutex& mtx){
-    for (size_t k = start_index; k < n ; k += num_threads) {
-        c[k] = (a[k] * b[k]) % p;
-    }
-}
-
-std::vector<int> convolution_parallel(std::vector<int> a, std::vector<int> b, int num_threads){
-    int n = std::max(a.size(), b.size());
-    a.resize(n);
-    b.resize(n);
-    std::vector<int> pair = prime_fft_find(n);
-    int p = pair[0];
-    std::vector<int> a_star = ntt_parallel(a, p, num_threads / 2);
-    std::vector<int> b_star = ntt_parallel(b, p, num_threads / 2);
-    std::vector<int> c_star(n);
-
-    std::vector<std::thread> threads;
-    threads.reserve(num_threads - 1);
-    std::mutex mtx;
-
-    for (size_t i = 1; i < num_threads; ++i) {
-        threads.emplace_back(compute_convolution_segment, std::cref(a_star), std::cref(b_star), std::ref(c_star), i, num_threads, n, p, std::ref(mtx));
-    }
-    compute_convolution_segment(a_star, b_star, c_star, 0, num_threads, n, p, mtx);
-
-    for (auto& th : threads) {
-        th.join();
-    }
-
-    return intt_parallel(c_star, p, num_threads);
-}
-
 
 /*------------------------------------Parallel fast convolution ------------------------------------*/
 
@@ -815,8 +763,7 @@ std::vector<int> convolution_fast_parallel(std::vector<int> a, std::vector<int> 
     int n = std::max(a.size(), b.size());
     a.resize(n);
     b.resize(n);
-    std::vector<int> pair = prime_fft_find(n);
-    int p = pair[0];
+    int p = prime_ntt_find(n);
     fast_ntt_parallel(a, p, num_threads / 2);
     fast_ntt_parallel(b, p, num_threads / 2);
     std::vector<int> c(n);
