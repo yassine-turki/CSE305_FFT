@@ -56,11 +56,9 @@ void write_img(const std::vector<complex> &img_data, int width, int height, cons
 void compute_fft_row(std::vector<complex>& img, int width, int height, int start, int end, size_t num_threads = 10) {
     for (int i = start; i < end; ++i) {
         std::vector<complex> row(img.begin() + i * width, img.begin() + (i + 1) * width);
-        if (num_threads == 1) {
-            row = Radix2FFT(row);
-        } else {
-            FFT_Radix2_Parallel(row, num_threads);
-        }
+
+        FFT_Radix2_Parallel(row, num_threads);
+
         std::copy(row.begin(), row.end(), img.begin() + i * width);
     }
 }
@@ -73,11 +71,9 @@ void compute_fft_column(std::vector<complex>& img, int width, int height, int st
             column[i] = img[i * width + j];
         }
 
-        if (num_threads == 1) {
-            column = Radix2FFT(column);
-        } else {
-            FFT_Radix2_Parallel(column, num_threads);
-        }
+
+        FFT_Radix2_Parallel(column, num_threads);
+
 
         for (int i = 0; i < height; ++i) {
             img[i * width + j] = column[i];
@@ -90,11 +86,9 @@ void compute_ifft_row(std::vector<complex>& img, int width, int height, int star
     for (int i = start; i < end; ++i) {
         std::vector<complex> row(img.begin() + i * width, img.begin() + (i + 1) * width);
 
-        if (num_threads == 1) {
-            row = InverseRadix2FFT(row);
-        } else {
-            Inverse_Radix2_Parallel(row, num_threads);
-        }
+
+        Inverse_Radix2_Parallel(row, num_threads);
+
 
         std::copy(row.begin(), row.end(), img.begin() + i * width);
     }
@@ -107,14 +101,7 @@ void compute_ifft_column(std::vector<complex>& img, int width, int height, int s
         for (int i = 0; i < height; ++i) {
             column[i] = img[i * width + j];
         }
-
-        if (num_threads == 1) {
-
-            column = InverseRadix2FFT(column);
-        } else {
-            Inverse_Radix2_Parallel(column, num_threads);
-        }
-
+        Inverse_Radix2_Parallel(column, num_threads);
         for (int i = 0; i < height; ++i) {
             img[i * width + j] = column[i];
         }
