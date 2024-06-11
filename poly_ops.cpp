@@ -79,3 +79,19 @@ std::vector<complex> multiply_polynomials_FFT(std::vector<complex> P, std::vecto
     }
     return InverseRadix2FFT(R_star);
 }
+
+std::vector<complex> multiply_polynomials_FFT_parallel(std::vector<complex> P, std::vector<complex> Q, int num_threads){
+    int N = P.size();
+    int M = Q.size();
+    int l = next_power_of_two(M + N);
+    P.resize(l);
+    Q.resize(l);
+    FFT_Radix2_Parallel(P, num_threads / 2);
+    FFT_Radix2_Parallel(Q, num_threads - num_threads / 2);
+    std::vector<complex> R(l);
+    for (int j = 0; j < l; j++){
+        R[j] = P[j] * Q[j];
+    }
+    Inverse_Radix2_Parallel(R, num_threads);
+    return R;
+}
