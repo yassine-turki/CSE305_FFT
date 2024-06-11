@@ -57,7 +57,7 @@ void compute_fft_row(std::vector<complex>& img, int width, int height, int start
     for (int i = start; i < end; ++i) {
         std::vector<complex> row(img.begin() + i * width, img.begin() + (i + 1) * width);
         if (num_threads == 1) {
-            Radix2FFT(row);
+            row = Radix2FFT(row);
         } else {
             FFT_Radix2_Parallel(row, num_threads);
         }
@@ -74,7 +74,7 @@ void compute_fft_column(std::vector<complex>& img, int width, int height, int st
         }
 
         if (num_threads == 1) {
-            Radix2FFT(column);
+            column = Radix2FFT(column);
         } else {
             FFT_Radix2_Parallel(column, num_threads);
         }
@@ -91,7 +91,7 @@ void compute_ifft_row(std::vector<complex>& img, int width, int height, int star
         std::vector<complex> row(img.begin() + i * width, img.begin() + (i + 1) * width);
 
         if (num_threads == 1) {
-            InverseRadix2FFT(row);
+            row = InverseRadix2FFT(row);
         } else {
             Inverse_Radix2_Parallel(row, num_threads);
         }
@@ -110,7 +110,7 @@ void compute_ifft_column(std::vector<complex>& img, int width, int height, int s
 
         if (num_threads == 1) {
 
-            InverseRadix2FFT(column);
+            column = InverseRadix2FFT(column);
         } else {
             Inverse_Radix2_Parallel(column, num_threads);
         }
@@ -132,6 +132,7 @@ void compute_ifft_img(std::vector<complex> &x, int width, int height, size_t num
 }
 
 
+/*------------------------ Image Compression ------------------------*/
 
 // Function to compute the threshold value for compression
 double get_threshold_value(const std::vector<complex>& data, double percentage_to_keep) {
