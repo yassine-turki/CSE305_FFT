@@ -470,7 +470,7 @@ std::vector<int> convolution_ntt_parallel(std::vector<int> a, std::vector<int> b
     a.resize(n);
     b.resize(n);
     std::vector<int> a_star = ntt_parallel(a, p, roots, num_threads / 2);
-    std::vector<int> b_star = ntt_parallel(b, p, roots, num_threads / 2);
+    std::vector<int> b_star = ntt_parallel(b, p, roots, num_threads - num_threads / 2);
     std::vector<int> c_star(n);
 
     std::vector<std::thread> threads;
@@ -540,7 +540,7 @@ void fast_ntt_parallel(std::vector<int>& a, int p, size_t num_threads) {
         th.join();
     }
     std::thread t1(fast_ntt_parallel, std::ref(u), p, num_threads / 2);
-    std::thread t2(fast_ntt_parallel, std::ref(v), p, num_threads / 2);
+    std::thread t2(fast_ntt_parallel, std::ref(v), p, num_threads - num_threads / 2);
     t1.join();
     t2.join();
 
@@ -707,7 +707,7 @@ std::vector<int> convolution_fast_parallel(std::vector<int> a, std::vector<int> 
     a.resize(n);
     b.resize(n);
     fast_ntt_parallel(a, p, num_threads / 2);
-    fast_ntt_parallel(b, p, num_threads / 2);
+    fast_ntt_parallel(b, p, num_threads - num_threads / 2);
     std::vector<int> c(n);
 
     std::vector<std::thread> threads;
