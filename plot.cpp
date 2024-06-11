@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <complex>
-#include "test.cpp"
+#include "compress.cpp"
 
 
 std::vector<double> benchmark_naive_dft(std::vector<complex> data, std::vector<int> num_threads, int num_executions) {

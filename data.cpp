@@ -5,7 +5,14 @@
 #include <fstream>
 #include <string>
 #include <random>
-#include "fft_multiplication.cpp"
+#include <chrono>
+#include <tuple>
+#include <algorithm>
+#include <unordered_map>
+#include <mutex>
+#include <thread>
+
+#include "ntt.cpp"
 
 #define M_PI 3.14159265358979323846
 
@@ -80,7 +87,7 @@ std::pair<std::vector<int>, std::vector<int>> generate_synthetic_data_ntt(int si
         poly_1[i] = random_int(p);
         poly_2[i] = random_int(p);
     }
-    return std::make_tuple(poly_1, poly_2);
+    return std::pair<std::vector<int>, std::vector<int>>(poly_1, poly_2);
 }
 
 

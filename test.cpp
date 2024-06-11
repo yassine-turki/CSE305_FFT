@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <chrono>
 #include <mutex>
-#include "data.cpp"
+#include "plot.cpp"
 
 #define M_PI 3.14159265358979323846
 
@@ -203,4 +203,51 @@ std::vector<double> test_convolutions(std::pair<std::vector<int>, std::vector<in
     std::chrono::duration<double> duration_fast_parallel = end_fast_parallel - start_fast_parallel;
     times.push_back(duration_fast_parallel.count());   
     return times;    
+}
+
+// Function to remove the extension from a file path
+
+std::string removeExtension(std::string& imagePath) {
+    size_t lastDot = imagePath.find_last_of(".");
+    if (lastDot == std::string::npos) {
+        return imagePath;
+    }
+    return imagePath.substr(0, lastDot);
+}
+
+void test_compression_weather_data(std::vector<complex> data, std::vector<int> percentages,size_t num_threads){
+    for(auto i : percentages){
+        int percentage_keep = i;
+        std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+        FFT_Radix2_Parallel(data, num_threads);
+        double threshold = get_threshold_value(data, percentage_keep/100.);
+        compress(data, threshold, num_threads);
+        Inverse_Radix2_Parallel(data, num_threads);
+        std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> duration = end - start;
+        std::string percentage_keep_str = std::to_string(percentage_keep);
+        std::string outfile_path = "../data/weather_data_keep" + percentage_keep_str + ".csv";
+        write_data(data, outfile_path);
+        std::cout << "Time taken for compression with " << percentage_keep << "% kept: " << duration.count() << "s\n";
+    }
+}
+
+void test_compression_image(std::string image_path, std::vector<int> percentages, size_t num_threads){
+    int w,h;
+    for(auto i : percentages){
+        int percentage_keep = i;
+        std::vector<complex> *img_data = read_img(image_path, w, h);
+        std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+        fft_image(*img_data, w, h, num_threads);
+        double threshold = get_threshold_value(*img_data, percentage_keep/100.);
+        compress(*img_data, threshold, num_threads);
+        inverse_fft_image(*img_data, w, h, num_threads);
+        std::string percentage_keep_str = std::to_string(percentage_keep);
+        std::string outfile_path = removeExtension(image_path) + "_keep" + percentage_keep_str + ".png";
+        write_img(*img_data, w, h, outfile_path);
+        std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> duration = end - start;
+        std::cout << "Time taken for compression with " << percentage_keep << "% kept: " << duration.count() << "s\n";
+    }
+
 }

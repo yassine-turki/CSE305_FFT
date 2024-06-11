@@ -241,40 +241,6 @@ std::vector<int> convolution_ntt(std::vector<int> a, std::vector<int> b, int p, 
 /*------------------------------------Fast convolution using NTT------------------------------------*/
 
 
-// std::vector<int> fast_ntt(std::vector<int> a, int p, std::unordered_map<int, std::pair<int, int>> roots) {
-//     int n = a.size();
-//     if(!is_power_of_two(n)){
-//         std::cout << "The input size " << n << " is not a power of 2! Resizing input" << std::endl;
-//         a.resize(next_power_of_two(a.size()));
-//         n = a.size();
-//     }
-
-//     if (n == 1) {
-//         return a;
-//     }
-
-//     int psi = roots[n].first;
-//     std::vector<int> u(n / 2), v(n / 2);
-//     for (int i = 0; i < n / 2; i++) {
-//         u[i] = a[2 * i];
-//         v[i] = a[2 * i + 1];
-//     }
-
-//     std::vector<int> u_star = fast_ntt(u, p, roots);
-//     std::vector<int> v_star = fast_ntt(v, p, roots);
-//     std::vector<int> a_star(n);
-
-//     int t = psi;
-//     for (int i = 0; i < n / 2; i++) {
-//         a_star[i] = (u_star[i] + t * v_star[i]) % p;
-//         if (a_star[i] < 0) a_star[i] += p;
-//         a_star[i + n / 2] = (u_star[i] - t * v_star[i]) % p;
-//         if (a_star[i + n / 2] < 0) a_star[i + n / 2] += p;
-//         t = (t * mod_exp(psi, 2, p)) % p;
-//     }
-//     return a_star;
-// }
-
 std::vector<int> fast_ntt(std::vector<int> a, int p) {
     int n = a.size();
     if(!is_power_of_two(n)){
