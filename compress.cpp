@@ -53,7 +53,7 @@ void write_img(const std::vector<complex> &img_data, int width, int height, cons
 
 
 // Function to compute FFT for rows
-void compute_fft_row(std::vector<complex>& img, int width, int height, int start, int end, int num_threads = 1) {
+void compute_fft_row(std::vector<complex>& img, int width, int height, int start, int end, size_t num_threads = 10) {
     for (int i = start; i < end; ++i) {
         std::vector<complex> row(img.begin() + i * width, img.begin() + (i + 1) * width);
         if (num_threads == 1) {
@@ -66,7 +66,7 @@ void compute_fft_row(std::vector<complex>& img, int width, int height, int start
 }
 
 
-void compute_fft_column(std::vector<complex>& img, int width, int height, int start, int end, int num_threads = 1) {
+void compute_fft_column(std::vector<complex>& img, int width, int height, int start, int end, size_t num_threads = 10) {
     for (int j = start; j < end; ++j) {
         std::vector<complex> column(height);
         for (int i = 0; i < height; ++i) {
@@ -86,7 +86,7 @@ void compute_fft_column(std::vector<complex>& img, int width, int height, int st
 }
 
 // Function to compute inverse FFT for rows
-void compute_ifft_row(std::vector<complex>& img, int width, int height, int start, int end, int num_threads = 1) {
+void compute_ifft_row(std::vector<complex>& img, int width, int height, int start, int end, size_t num_threads = 10) {
     for (int i = start; i < end; ++i) {
         std::vector<complex> row(img.begin() + i * width, img.begin() + (i + 1) * width);
 
@@ -101,7 +101,7 @@ void compute_ifft_row(std::vector<complex>& img, int width, int height, int star
 }
 
 // Function to compute inverse FFT for columns
-void compute_ifft_column(std::vector<complex>& img, int width, int height, int start, int end, int num_threads = 1) {
+void compute_ifft_column(std::vector<complex>& img, int width, int height, int start, int end, size_t num_threads = 10) {
     for (int j = start; j < end; ++j) {
         std::vector<complex> column(height);
         for (int i = 0; i < height; ++i) {
@@ -121,12 +121,12 @@ void compute_ifft_column(std::vector<complex>& img, int width, int height, int s
     }
 }
 
-void compute_fft_img(std::vector<complex> &x, int width, int height, size_t num_threads = 1) {
+void compute_fft_img(std::vector<complex> &x, int width, int height, size_t num_threads = 10) {
     compute_fft_row(x, width, height, 0, height, num_threads);
     compute_fft_column(x, width, height, 0, width, num_threads);
 }
 
-void compute_ifft_img(std::vector<complex> &x, int width, int height, size_t num_threads = 1) {
+void compute_ifft_img(std::vector<complex> &x, int width, int height, size_t num_threads = 10) {
     compute_ifft_row(x, width, height, 0, width, num_threads);
     compute_ifft_column(x, width, height, 0, height, num_threads);
 }
