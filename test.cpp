@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <chrono>
 #include <mutex>
-#include "plot.cpp"
+#include "benchmark.cpp"
 
 #define M_PI 3.14159265358979323846
 
