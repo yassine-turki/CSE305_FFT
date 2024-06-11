@@ -222,6 +222,8 @@ void inverse_fft_image(
     compute_ifft_column(x, width, height, 0, height, num_sub_threads);
 }
 
+
+
 // Function to compute the threshold value for compression
 double get_threshold_value(const std::vector<complex>& data, double percentage_to_keep) {
     std::vector<double> abs_data;
