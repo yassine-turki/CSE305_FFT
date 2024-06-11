@@ -238,10 +238,10 @@ void test_compression_image(std::string image_path, std::vector<int> percentages
         int percentage_keep = i;
         std::vector<complex> *img_data = read_img(image_path, w, h);
         std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
-        fft_image(*img_data, w, h, num_threads);
+        compute_fft_img(*img_data, w, h, num_threads);
         double threshold = get_threshold_value(*img_data, percentage_keep/100.);
         compress(*img_data, threshold, num_threads);
-        inverse_fft_image(*img_data, w, h, num_threads);
+        compute_ifft_img(*img_data, w, h, num_threads);
         std::string percentage_keep_str = std::to_string(percentage_keep);
         std::string outfile_path = removeExtension(image_path) + "_keep" + percentage_keep_str + ".png";
         write_img(*img_data, w, h, outfile_path);
